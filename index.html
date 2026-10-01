@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
-<title>푸로찜에스 티맵 경로 도우미 v3.0</title>
+<title>푸로찜에스 티맵 경로 도우미 v3.1</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
@@ -46,26 +46,29 @@
     border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;
     background:#fbfdff;
   }
-  .row.goal{background:#fff7ed;border-color:#fed7aa}
+  .row.goal{background:#fff7ed;border-color:#fdba74;box-shadow:inset 3px 0 0 #ea580c}
   .num{
     width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;
     display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;
   }
   .row.goal .num{background:#ea580c}
-  .f{display:flex;flex-direction:column;gap:6px}
+  .f{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .fld{position:relative}
   input[type=text]{
     width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;
     font-size:14px;background:#fff;color:var(--txt);
   }
   input[type=text]:focus{outline:2px solid #bfdbfe;border-color:var(--brand)}
-  .acts{display:flex;flex-direction:column;gap:6px}
+  .acts{display:grid;grid-template-columns:repeat(3,30px);gap:5px}
+  .acts .btn{padding:0;width:30px;height:28px;font-size:12px;line-height:1;border-radius:7px}
   .badge{font-size:11px;font-weight:700;padding:3px 7px;border-radius:999px;display:inline-block}
   .b-ok{background:#dcfce7;color:#15803d}
+  .b-warn{background:#fef3c7;color:#92400e}
   .b-err{background:#fee2e2;color:#b91c1c}
   .b-cache{background:#e0e7ff;color:#3730a3}
   .b-wait{background:#f1f5f9;color:#64748b}
   .meta{font-size:11px;color:var(--muted);word-break:break-all;line-height:1.5}
-  #map{height:340px;border-radius:12px;display:none;margin-bottom:12px}
+  #map{height:340px;border-radius:12px;display:none;margin-bottom:12px;background:#e2e8f0}
   .msg{
     font-size:13px;padding:11px 12px;border-radius:10px;white-space:pre-wrap;
     line-height:1.6;word-break:break-word;
@@ -93,6 +96,24 @@
     flex:0 0 auto;
   }
   .hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6}
+  /* ── v3.1 자동완성 드롭다운 (모바일 키보드 가림 방지) ── */
+  .dropdown{
+    position:absolute;left:0;right:0;top:100%;z-index:60;margin-top:4px;
+    background:#fff;border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 10px 26px rgba(15,23,42,.18);
+    max-height:184px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    display:none;
+  }
+  .dropdown.show{display:block}
+  .dd-item{
+    display:flex;flex-direction:column;gap:2px;
+    padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;
+  }
+  .dd-item:last-child{border-bottom:0}
+  .dd-item:active,.dd-item.hl{background:#eff6ff}
+  .dd-name{font-size:13.5px;font-weight:600;color:#0f172a}
+  .dd-addr{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dd-empty{padding:11px 12px;font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -100,8 +121,8 @@
 <header>
   <div class="hrow">
     <div>
-      <h1>🚗 푸로찜에스 티맵 경로 도우미 <span style="color:#60a5fa">v3.0</span></h1>
-      <p>노션 거래처 · 주소 자동 연동 → 경유지 최적화 → 티맵 이동</p>
+      <h1>🚗 푸로찜에스 티맵 경로 도우미 <span style="color:#60a5fa">v3.1</span></h1>
+      <p>노션 거래처 · 주소 자동 연동 → 경로 최적화 → 티맵 이동</p>
     </div>
     <button class="btn ghost small" id="btnTest">🔗 연결테스트</button>
   </div>
@@ -130,8 +151,11 @@
       <button class="btn ghost small" id="btnClear">전체 지우기</button>
     </div>
     <div class="hint">
-      거래처명을 입력하면 노션 주소가 자동으로 채워집니다. 노션에 없는 주소는 <b>주소칸에 직접 입력</b>하세요.
-      ★ 버튼으로 최종 목적지를 지정합니다(1곳 필수).
+      거래처명을 한두 글자만 입력해도 노션 주소가 자동으로 채워집니다.<br>
+      아래 목록에서 <b>거래처를 직접 눌러 선택</b>할 수도 있습니다.<br>
+      노션에 없는 주소는 <b>주소칸에 직접 입력</b>하세요.<br>
+      <b>▲▼</b> 순서변경 · <b>★</b> 목적지 지정 · <b>📍</b> 주소확인 · <b>🔍</b> 원인진단 · <b>✕</b> 삭제<br>
+      목적지 1곳만 입력하면 경유지 최적화를 건너뛰고 바로 티맵으로 안내합니다.
     </div>
   </div>
 
@@ -146,7 +170,7 @@
     </div>
     <div class="legend">
       · <b>티맵 앱으로 열기</b>는 최적화된 경유지 순서를 티맵에 전달합니다.<br>
-      · 기기/티맵 버전에 따라 경유지 전달이 안 되면 <b>목적지만 열기</b>를 사용한 뒤 경유지 순서를 참고하세요.
+      · 기기/티맵 버전에 따라 경유지 전달이 안 되면 <b>목적지만 열기</b>를 사용한 뒤 화면의 순서를 참고하세요.
     </div>
   </div>
 
@@ -159,26 +183,28 @@
 
 </div>
 
+<!-- ⭐ v3.1 핵심 수정 : Leaflet "JS" 는 v3.0 에서 누락되어 있었다 (L is not defined 원인) -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
 /* ============================================================================
    ⚙️ 1. 설정 — 여기만 수정하세요
    ============================================================================ */
 const GAS_URL =
-  'https://script.google.com/macros/s/AKfycbzQRb2mZct2AmolqCYQS9TfXoC7RqgI_aumJdt-RKd6asqy7mfapE6MAjuv9nIILEyduA/exec';
+  'https://script.google.com/macros/s/AKfycbzmQHbGWIC04-vt_1UzBLYInO9-99-s1pjJ0IsWvJwcevHN3zthWEgkM7kK64i4yN8c/exec';
 const MAX_ROWS = 6;
 
-let CLIENTS   = [];   // 노션 거래처 목록
-let ROWS      = [];   // 화면 행 모델
-let START     = { name: '현재위치', lat: 37.566826, lng: 126.9786567, manual: false };
-let RESULT    = null; // optimroute 결과
-let map       = null;
-let mapLayer  = null;
-
-/* ============================================================================
-   ⚙️ 2. GAS 호출 (JSONP — GitHub Pages 크로스도메인 100% 안전)
-   ============================================================================ */
+let CLIENTS  = [];
+let ROWS     = [];
+let START    = { name: '현재위치', lat: 37.566826, lng: 126.9786567, manual: false };
+let RESULT   = null;
+let map      = null;
+let mapLayer = null;
 let jsonpSeq = 0;
 
+/* ============================================================================
+   ⚙️ 2. GAS 호출 (JSONP)
+   ============================================================================ */
 function callApi(payload, timeoutMs) {
   timeoutMs = timeoutMs || 60000;
 
@@ -186,8 +212,8 @@ function callApi(payload, timeoutMs) {
 
     const cb  = '__gas_cb_' + (++jsonpSeq) + '_' + Date.now();
     const url = GAS_URL +
-      '?action='  + encodeURIComponent(payload.action) +
-      '&payload=' + encodeURIComponent(JSON.stringify(payload)) +
+      '?action='   + encodeURIComponent(payload.action) +
+      '&payload='  + encodeURIComponent(JSON.stringify(payload)) +
       '&callback=' + cb;
 
     const script = document.createElement('script');
@@ -229,6 +255,7 @@ function callApi(payload, timeoutMs) {
    ⚙️ 3. UI 유틸
    ============================================================================ */
 const $ = function (id) { return document.getElementById(id); };
+
 const esc = function (s) {
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -241,19 +268,191 @@ function showResult(html, cls) {
     + html + '</div>';
 }
 
+function normalizeName(t) {
+  return String(t || '')
+    .toLowerCase()
+    .replace(/[\s\u00a0]+/g, '')
+    .replace(/\(주\)|주식회사|\(유\)|유한회사|㈜|co\.?ltd\.?/gi, '')
+    .replace(/[^가-힣a-z0-9]/g, '');
+}
+
 /* ============================================================================
-   ⚙️ 4. 행 렌더링
+   ⚙️ 4. 거래처 자동완성 드롭다운 (v3.1 신규)
+      · 최대 5건 + max-height 스크롤 → 모바일 키보드 가림 해결
+      · pointerdown + preventDefault → blur 로 닫히기 전에 선택이 먹는다
+      · 입력값이 있을 때만 표시
+   ============================================================================ */
+const DD_LIMIT = 5;
+let DD = { rowId: null, items: [], idx: -1 };
+
+function attachAutocomplete(input) {
+
+  input.addEventListener('input', function () {
+    openDropdown(input);
+  });
+
+  input.addEventListener('focus', function () {
+    setTimeout(function () {
+      try { input.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      catch (e) { input.scrollIntoView(); }
+    }, 220);
+    if (input.value.trim()) openDropdown(input);
+  });
+
+  input.addEventListener('blur', function () {
+    setTimeout(closeDropdown, 220);
+  });
+
+  input.addEventListener('keydown', function (ev) {
+    if (!DD.rowId || DD.rowId !== input.dataset.id || !DD.items.length) return;
+
+    if (ev.key === 'ArrowDown')    { ev.preventDefault(); moveDd(1); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); moveDd(-1); }
+    else if (ev.key === 'Enter')   { ev.preventDefault(); pickDd(DD.idx < 0 ? 0 : DD.idx); }
+    else if (ev.key === 'Escape')  { closeDropdown(); }
+  });
+}
+
+function findClients(query) {
+  const q = normalizeName(query);
+  if (!q) return [];
+
+  const starts = [];
+  const contains = [];
+
+  for (let i = 0; i < CLIENTS.length; i++) {
+    const c = CLIENTS[i];
+    if (!c.norm) continue;
+    if (c.norm.indexOf(q) === 0) starts.push(c);
+    else if (c.norm.indexOf(q) !== -1) contains.push(c);
+    if (starts.length >= DD_LIMIT) break;
+  }
+
+  return starts.concat(contains).slice(0, DD_LIMIT);
+}
+
+function openDropdown(input) {
+
+  const rowId = input.dataset.id;
+  const box   = document.getElementById('dd_' + rowId);
+  if (!box) return;
+
+  if (!input.value.trim()) { closeDropdown(); return; }
+
+  const items = findClients(input.value);
+
+  if (!items.length) {
+    box.innerHTML = '<div class="dd-empty">노션에 일치하는 거래처가 없습니다. 주소를 직접 입력하세요.</div>';
+    box.classList.add('show');
+    box._items = [];
+    DD = { rowId: rowId, items: [], idx: -1 };
+    return;
+  }
+
+  box.innerHTML = items.map(function (c, i) {
+    return '<div class="dd-item" data-rowid="' + rowId + '" data-idx="' + i + '">'
+      +   '<span class="dd-name">' + esc(c.name) + '</span>'
+      +   '<span class="dd-addr">' + esc(c.address || '(주소 없음)') + '</span>'
+      + '</div>';
+  }).join('');
+
+  box.classList.add('show');
+  box._items = items;
+  DD = { rowId: rowId, items: items, idx: -1 };
+}
+
+function closeDropdown() {
+  const nodes = document.querySelectorAll('.dropdown.show');
+  for (let i = 0; i < nodes.length; i++) nodes[i].classList.remove('show');
+  DD = { rowId: null, items: [], idx: -1 };
+}
+
+function moveDd(step) {
+  if (!DD.items.length) return;
+  DD.idx = (DD.idx + step + DD.items.length) % DD.items.length;
+
+  const box = document.getElementById('dd_' + DD.rowId);
+  if (!box) return;
+
+  const els = box.querySelectorAll('.dd-item');
+  for (let i = 0; i < els.length; i++) els[i].classList.toggle('hl', i === DD.idx);
+  if (els[DD.idx]) { try { els[DD.idx].scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+}
+
+function pickDd(idx) {
+
+  const rowId = DD.rowId;
+  const c = DD.items ? DD.items[idx] : null;
+  if (!rowId || !c) return;
+
+  const row = ROWS.find(function (r) { return r.id === rowId; });
+  if (!row) return;
+
+  row.name = c.name;
+  if (c.address) row.address = c.address;
+  row.geo = null;
+
+  const nameEl = document.querySelector('input[data-id="' + rowId + '"][data-k="name"]');
+  const addrEl = document.querySelector('input[data-id="' + rowId + '"][data-k="address"]');
+  if (nameEl) nameEl.value = row.name;
+  if (addrEl) addrEl.value = row.address || '';
+
+  closeDropdown();
+  updateRowStatus(rowId);
+  if (nameEl) nameEl.blur();
+}
+
+// ⭐ 선택은 pointerdown 에서 처리 (blur 보다 먼저 실행 → 클릭이 먹는다)
+document.addEventListener('pointerdown', function (ev) {
+
+  const item = (ev.target && ev.target.closest) ? ev.target.closest('.dd-item') : null;
+  if (!item) return;
+
+  ev.preventDefault();
+
+  const rowId = item.dataset.rowid;
+  const box = document.getElementById('dd_' + rowId);
+  if (!box || !box._items) return;
+
+  const els = Array.prototype.slice.call(box.querySelectorAll('.dd-item'));
+  const idx = els.indexOf(item);
+  if (idx < 0) return;
+
+  DD.rowId = rowId;
+  DD.items = box._items;
+
+  pickDd(idx);
+}, true);
+
+// mousedown 폴백
+document.addEventListener('mousedown', function (ev) {
+  if (ev.target.closest && ev.target.closest('.dd-item')) ev.preventDefault();
+}, true);
+
+// 바깥 탭하면 닫기
+document.addEventListener('click', function (ev) {
+  if (ev.target.closest && (ev.target.closest('.dropdown') || ev.target.closest('input[data-k="name"]'))) return;
+  closeDropdown();
+});
+
+/* ============================================================================
+   ⚙️ 5. 행 렌더링 (순번 + ▲▼ 순서변경)
    ============================================================================ */
 function addRow(prefill) {
+
   if (ROWS.length >= MAX_ROWS) { alert('최대 ' + MAX_ROWS + '곳까지 입력할 수 있습니다.'); return; }
+
   ROWS.push({
-    id: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    id: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
     name:    (prefill && prefill.name)    || '',
     address: (prefill && prefill.address) || '',
     isGoal:  (prefill && prefill.isGoal)  || false,
     geo:     null
   });
-  if (!ROWS.some(function (r) { return r.isGoal; })) ROWS[ROWS.length - 1].isGoal = true;
+
+  if (!ROWS.some(function (r) { return r.isGoal; })) {
+    ROWS[ROWS.length - 1].isGoal = true;
+  }
   renderRows();
 }
 
@@ -269,52 +468,109 @@ function setGoal(id) {
   renderRows();
 }
 
+// ⭐ v3.1 : ▲▼ 로 위아래 순서 이동
+function moveRow(id, dir) {
+  const i = ROWS.findIndex(function (r) { return r.id === id; });
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= ROWS.length) return;
+
+  const tmp = ROWS[i];
+  ROWS[i] = ROWS[j];
+  ROWS[j] = tmp;
+
+  renderRows();
+}
+
+function statusBadgeHtml(r) {
+  if (!r.geo) return '<span class="badge b-wait">미확인</span>';
+  if (!r.geo.ok) return '<span class="badge b-err">좌표 실패</span>';
+
+  const q = r.geo.matchQuality || '';
+  const cls = (q && q.indexOf('정확') === -1) ? 'b-warn' : (r.geo.cached ? 'b-cache' : 'b-ok');
+
+  return '<span class="badge ' + cls + '">'
+    + (r.geo.cached ? '캐시' : '좌표 OK')
+    + (r.geo.source ? ' · ' + esc(r.geo.source) : '')
+    + (q ? ' · ' + esc(q) : '')
+    + '</span>';
+}
+
+function statusMetaHtml(r) {
+  if (!r.geo) return '';
+
+  if (r.geo.ok) {
+    return '<div class="meta">'
+      + '✅ ' + Number(r.geo.lat).toFixed(6) + ', ' + Number(r.geo.lng).toFixed(6)
+      + (r.geo.matched ? ' · ' + esc(r.geo.matched) : '')
+      + (r.geo.matchFlag ? '<br>매칭코드: ' + esc(r.geo.matchFlag) : '')
+      + '</div>';
+  }
+
+  return '<div class="meta">'
+    + '❌ ' + esc(r.geo.reason || '실패')
+    + (r.geo.cleanAddress ? '<br>정제된 주소: "' + esc(r.geo.cleanAddress) + '"' : '')
+    + '</div>';
+}
+
 function renderRows() {
 
   const html = ROWS.map(function (r, i) {
 
-    const badge = r.geo
-      ? (r.geo.ok
-          ? '<span class="badge ' + (r.geo.cached ? 'b-cache' : 'b-ok') + '">'
-              + (r.geo.cached ? '캐시' : '좌표 OK')
-              + (r.geo.source ? ' · ' + esc(r.geo.source) : '') + '</span>'
-          : '<span class="badge b-err">좌표 실패</span>')
-      : '<span class="badge b-wait">미확인</span>';
-
-    const meta = r.geo
-      ? '<div class="meta">'
-          + (r.geo.ok
-              ? '✅ ' + r.geo.lat.toFixed(6) + ', ' + r.geo.lng.toFixed(6)
-                + (r.geo.matched ? ' · ' + esc(r.geo.matched) : '')
-              : '❌ ' + esc(r.geo.reason || '실패')
-                + (r.geo.cleanAddress ? '<br>정제된 주소: "' + esc(r.geo.cleanAddress) + '"' : ''))
-          + '</div>'
-      : '';
-
     return ''
       + '<div class="row' + (r.isGoal ? ' goal' : '') + '">'
-      +   '<div class="num">' + (r.isGoal ? '★' : (i + 1)) + '</div>'
+      +   '<div class="num">' + (i + 1) + '</div>'
       +   '<div class="f">'
-      +     '<input type="text" list="clientList" data-id="' + r.id + '" data-k="name"'
-      +       ' placeholder="거래처명 (노션 자동완성)" value="' + esc(r.name) + '">'
-      +     '<input type="text" data-id="' + r.id + '" data-k="address"'
+      +     '<div class="fld">'
+      +       '<input type="text" autocomplete="off" data-id="' + r.id + '" data-k="name"'
+      +         ' placeholder="거래처명 (노션 자동완성)" value="' + esc(r.name) + '">'
+      +       '<div class="dropdown" id="dd_' + r.id + '"></div>'
+      +     '</div>'
+      +     '<input type="text" autocomplete="off" data-id="' + r.id + '" data-k="address"'
       +       ' placeholder="주소 (자동 입력 · 직접 수정 가능)" value="' + esc(r.address) + '">'
-      +     badge + meta
+      +     statusBadgeHtml(r)
+      +     statusMetaHtml(r)
       +   '</div>'
       +   '<div class="acts">'
-      +     '<button class="btn ghost small" data-a="goal"  data-id="' + r.id + '">★ 목적지</button>'
-      +     '<button class="btn ghost small" data-a="check" data-id="' + r.id + '">📍 주소확인</button>'
-      +     '<button class="btn ghost small" data-a="diag"  data-id="' + r.id + '">🔍 원인진단</button>'
-      +     '<button class="btn ghost small" data-a="del"   data-id="' + r.id + '">삭제</button>'
+      +     '<button class="btn ghost" data-a="up"    data-id="' + r.id + '" title="위로">▲</button>'
+      +     '<button class="btn ghost" data-a="down"  data-id="' + r.id + '" title="아래로">▼</button>'
+      +     '<button class="btn ghost" data-a="goal"  data-id="' + r.id + '" title="목적지 지정">★</button>'
+      +     '<button class="btn ghost" data-a="check" data-id="' + r.id + '" title="주소확인">📍</button>'
+      +     '<button class="btn ghost" data-a="diag"  data-id="' + r.id + '" title="원인진단">🔍</button>'
+      +     '<button class="btn ghost" data-a="del"   data-id="' + r.id + '" title="삭제">✕</button>'
       +   '</div>'
       + '</div>';
   }).join('');
 
   $('rows').innerHTML = html || '<div class="meta">배송지를 추가하세요.</div>';
+
+  ROWS.forEach(function (r) {
+    const inp = document.querySelector('input[data-id="' + r.id + '"][data-k="name"]');
+    if (inp) attachAutocomplete(inp);
+  });
 }
 
-// 이벤트 위임
+// 상태 배지만 부분 갱신 (재렌더 없이 → 포커스 유지)
+function updateRowStatus(id) {
+
+  const row = ROWS.find(function (r) { return r.id === id; });
+  if (!row) return;
+
+  const card = document.querySelector('input[data-id="' + id + '"][data-k="name"]');
+  const box  = card ? card.closest('.row') : null;
+  if (!box) return;
+
+  const f = box.querySelector('.f');
+  if (!f) return;
+
+  const old = f.querySelectorAll('.badge, .meta');
+  for (let i = 0; i < old.length; i++) old[i].remove();
+
+  f.insertAdjacentHTML('beforeend', statusBadgeHtml(row) + statusMetaHtml(row));
+}
+
+/* ── 입력 / 버튼 이벤트 위임 ── */
 $('rows').addEventListener('input', function (ev) {
+
   const t = ev.target;
   if (!t.dataset || !t.dataset.id) return;
 
@@ -322,19 +578,23 @@ $('rows').addEventListener('input', function (ev) {
   if (!row) return;
 
   if (t.dataset.k === 'name') {
+
     row.name = t.value;
-    // ⭐ 거래처명이 노션 목록과 일치하면 주소 자동 채움
+    row.geo  = null;
+
+    // ⭐ 기존 자동 채움 로직 그대로 유지
     const norm = normalizeName(t.value);
-    const hit = CLIENTS.find(function (c) { return c.norm === norm; })
-             || CLIENTS.find(function (c) { return c.norm && norm && c.norm.indexOf(norm) === 0; });
-    if (hit && hit.address) {
-      row.address = hit.address;
-      const addrInput = document.querySelector(
-        'input[data-id="' + row.id + '"][data-k="address"]'
-      );
-      if (addrInput) addrInput.value = hit.address;
+    if (norm) {
+      const hit = CLIENTS.find(function (c) { return c.norm === norm; })
+               || CLIENTS.find(function (c) { return c.norm && c.norm.indexOf(norm) === 0; });
+      if (hit && hit.address && hit.address !== row.address) {
+        row.address = hit.address;
+        const addrInput = document.querySelector(
+          'input[data-id="' + row.id + '"][data-k="address"]'
+        );
+        if (addrInput) addrInput.value = hit.address;
+      }
     }
-    row.geo = null;
   }
 
   if (t.dataset.k === 'address') {
@@ -344,28 +604,23 @@ $('rows').addEventListener('input', function (ev) {
 });
 
 $('rows').addEventListener('click', function (ev) {
-  const btn = ev.target.closest('button[data-a]');
+
+  const btn = ev.target.closest ? ev.target.closest('button[data-a]') : null;
   if (!btn) return;
 
   const id  = btn.dataset.id;
   const act = btn.dataset.a;
 
-  if (act === 'del')   { removeRow(id); return; }
-  if (act === 'goal')  { setGoal(id);   return; }
-  if (act === 'check') { checkOne(id);  return; }
-  if (act === 'diag')  { diagnoseOne(id); return; }
+  if (act === 'del')   { removeRow(id);    return; }
+  if (act === 'goal')  { setGoal(id);      return; }
+  if (act === 'up')    { moveRow(id, -1);  return; }
+  if (act === 'down')  { moveRow(id,  1);  return; }
+  if (act === 'check') { checkOne(id);     return; }
+  if (act === 'diag')  { diagnoseOne(id);  return; }
 });
 
-function normalizeName(t) {
-  return String(t || '')
-    .toLowerCase()
-    .replace(/[\s\u00a0]+/g, '')
-    .replace(/\(주\)|주식회사|\(유\)|유한회사|㈜|co\.?ltd\.?/gi, '')
-    .replace(/[^가-힣a-z0-9]/g, '');
-}
-
 /* ============================================================================
-   ⚙️ 5. 단건 좌표 확인 / 원인 진단
+   ⚙️ 6. 단건 좌표 확인 / 원인 진단
    ============================================================================ */
 async function checkOne(id) {
 
@@ -384,14 +639,17 @@ async function checkOne(id) {
 
     const g = (res.results || [])[0];
     row.geo = g;
-    renderRows();
+    updateRowStatus(id);
 
     if (g && g.ok) {
       showResult(
         '✅ <b>' + esc(row.name || '(이름없음)') + '</b> 좌표 확보<br>'
-        + '· 위도/경도: ' + g.lat.toFixed(6) + ', ' + g.lng.toFixed(6) + '<br>'
+        + '· 위도/경도: ' + Number(g.lat).toFixed(6) + ', ' + Number(g.lng).toFixed(6) + '<br>'
         + '· 사용된 방식: ' + esc(g.source || '-') + '<br>'
-        + (g.matched ? '· 매칭 주소: ' + esc(g.matched) : ''),
+        + (g.matchFlag ? '· 매칭코드: ' + esc(g.matchFlag)
+            + ' (' + esc(g.matchQuality || '설명없음') + ')<br>' : '')
+        + (g.matched ? '· 매칭 주소: ' + esc(g.matched) : '')
+        + (g.cached ? '<br>· 캐시에서 즉시 반환 (TMAP 호출 없음)' : ''),
         'ok'
       );
     } else {
@@ -423,24 +681,31 @@ async function diagnoseOne(id) {
     let html = '<b>🔍 ' + esc(row.name || '(이름없음)') + ' 진단 결과</b><br>'
       + '· 입력 주소: "' + esc(res.input.address || '(없음)') + '"<br>'
       + '· 정제 주소: "' + esc(res.cleaned.address || '(없음)') + '"<br>'
-      + '· 주소 형태 판정: ' + (res.looksLikeAddress ? '주소로 인정 ✅' : '주소 아님 ❌ (상호명으로 판단)') + '<br>'
+      + '· 주소 형태 판정: '
+      + (res.looksLikeAddress ? '주소로 인정 ✅' : '주소 아님 ❌ (상호명으로 판단)') + '<br>'
       + '· TMAP 시도 횟수: ' + res.attempts.length + '회<hr>';
 
     res.attempts.forEach(function (a) {
       html += '<b>[' + esc(a.method) + '] HTTP ' + esc(a.httpCode)
-        + (a.ok ? ' → ✅ 성공 ' + a.lat + ', ' + a.lng : ' → ❌ 실패') + '</b>'
-        + '<details><summary>원본 응답 보기</summary><pre>'
-        + esc(a.raw) + '</pre></details>';
+        + (a.ok
+            ? ' → ✅ 성공 ' + a.lat + ', ' + a.lng
+              + (a.matchFlag ? ' · ' + esc(a.matchFlag) + ' (' + esc(a.matchQuality || '') + ')' : '')
+            : ' → ❌ 실패')
+        + '</b>'
+        + '<details><summary>원본 응답 보기</summary><pre>' + esc(a.raw) + '</pre></details>';
     });
 
-    showResult(html, res.attempts.some(function(a){return a.ok;}) ? 'ok' : 'err');
-
-    // 성공한 시도가 있으면 행 상태 갱신
     const good = res.attempts.find(function (a) { return a.ok; });
+    showResult(html, good ? 'ok' : 'err');
+
     if (good) {
-      row.geo = { ok: true, lat: good.lat, lng: good.lng, source: good.method,
-                  matched: good.matchedAddress || '' };
-      renderRows();
+      row.geo = {
+        ok: true, lat: good.lat, lng: good.lng, source: good.method,
+        matchFlag: good.matchFlag || '',
+        matchQuality: good.matchQuality || '',
+        matched: good.matchedAddress || ''
+      };
+      updateRowStatus(id);
     }
 
   } catch (err) {
@@ -449,7 +714,7 @@ async function diagnoseOne(id) {
 }
 
 /* ============================================================================
-   ⚙️ 6. 출발지
+   ⚙️ 7. 출발지
    ============================================================================ */
 $('btnGps').addEventListener('click', function () {
 
@@ -488,30 +753,23 @@ $('startName').addEventListener('input', function () {
 });
 
 /* ============================================================================
-   ⚙️ 7. 거래처 목록 로드
+   ⚙️ 8. 거래처 목록 로드
    ============================================================================ */
 async function loadClients() {
   try {
     const res = await callApi({ action: 'getclients' }, 90000);
     if (res.ok && res.clients) {
-      CLIENTS = res.clients;
-      renderClientDatalist();
+      CLIENTS = res.clients.map(function (c) {
+        return {
+          name: c.name || '',
+          address: c.address || '',
+          norm: c.norm || normalizeName(c.name)
+        };
+      });
     }
   } catch (err) {
     console.warn('거래처 목록 로드 실패:', err.message);
   }
-}
-
-function renderClientDatalist() {
-  let dl = $('clientList');
-  if (!dl) {
-    dl = document.createElement('datalist');
-    dl.id = 'clientList';
-    document.body.appendChild(dl);
-  }
-  dl.innerHTML = CLIENTS.map(function (c) {
-    return '<option value="' + esc(c.name) + '"></option>';
-  }).join('');
 }
 
 $('btnTest').addEventListener('click', async function () {
@@ -542,7 +800,7 @@ $('btnTest').addEventListener('click', async function () {
 });
 
 /* ============================================================================
-   ⚙️ 8. 경로 최적화 실행
+   ⚙️ 9. 경로 실행 (목적지 1곳도 허용)
    ============================================================================ */
 function buildStops() {
 
@@ -550,16 +808,19 @@ function buildStops() {
     return (r.name || '').trim() || (r.address || '').trim();
   });
 
-  if (filled.length < 2) {
-    throw new Error('최소 2곳(경유지 1 + 목적지 1)을 입력하세요.');
+  // ⭐ v3.1 : 최소 1곳 (목적지만)
+  if (filled.length < 1) {
+    throw new Error('목적지를 최소 1곳 입력하세요.');
   }
 
   const goal = filled.find(function (r) { return r.isGoal; }) || filled[filled.length - 1];
   const rest = filled.filter(function (r) { return r !== goal; });
 
-  // ⭐ GAS 규칙: 마지막 원소 = 목적지(고정 종점)
   return rest.concat([goal]).map(function (r) {
-    return { name: (r.name || '').trim() || '이름없음', address: (r.address || '').trim() };
+    return {
+      name:    (r.name    || '').trim() || '이름없음',
+      address: (r.address || '').trim()
+    };
   });
 }
 
@@ -572,18 +833,20 @@ $('btnRun').addEventListener('click', async function () {
   $('btnRun').disabled = true;
 
   try {
-    // ① 좌표 일괄 확인 (실패 지점을 먼저 잡아낸다)
-    showResult('⏳ 1/2 좌표 확인 중…', 'info');
+    showResult('⏳ 1/2 좌표 확인 중… (요청 ' + stops.length + '곳)', 'info');
     const geoRes = await callApi({ action: 'geocode', stops: stops });
 
     (geoRes.results || []).forEach(function (g, i) {
+
+      const s = stops[i];
+      if (!s) return;
+
       const target = ROWS.find(function (r) {
-        return ((r.name || '').trim() || '이름없음') === stops[i].name
-            && (r.address || '').trim() === stops[i].address;
+        return ((r.name || '').trim() || '이름없음') === s.name
+            && (r.address || '').trim() === s.address;
       });
-      if (target) target.geo = g;
+      if (target) { target.geo = g; updateRowStatus(target.id); }
     });
-    renderRows();
 
     const failed = (geoRes.results || []).filter(function (g) { return !g.ok; });
 
@@ -593,21 +856,21 @@ $('btnRun').addEventListener('click', async function () {
         + failed.map(function (f) {
             return '· <b>' + esc(f.name) + '</b>: ' + esc(f.reason);
           }).join('<br>')
-        + '<hr>→ 해당 행의 <b>✏️ 주소수정</b> 후 <b>📍주소확인</b>, '
-        + '또는 <b>🔍원인진단</b>으로 TMAP 원본 응답을 확인하세요.',
+        + '<hr>→ 해당 행의 주소를 수정한 뒤 <b>📍</b> 주소확인, '
+        + '또는 <b>🔍</b> 원인진단으로 TMAP 원본 응답을 확인하세요.',
         'err'
       );
       return;
     }
 
-    // ② 경유지 순서 최적화
-    showResult('⏳ 2/2 경유지 순서 최적화 중…', 'info');
+    showResult(
+      stops.length === 1
+        ? '⏳ 2/2 목적지 경로 계산 중… (경유지 최적화 생략)'
+        : '⏳ 2/2 경유지 순서 최적화 중… (요청 ' + stops.length + '곳)',
+      'info'
+    );
 
-    const res = await callApi({
-      action: 'optimroute',
-      start: START,
-      stops: stops
-    }, 120000);
+    const res = await callApi({ action: 'optimroute', start: START, stops: stops }, 120000);
 
     if (!res.ok) {
       showResult('❌ ' + esc(res.error), 'err');
@@ -615,11 +878,25 @@ $('btnRun').addEventListener('click', async function () {
     }
 
     RESULT = res;
-    drawMap(res);
-    renderOrder(res);
+    syncResultGeoToRows(res);
 
-    $('btnTmap').disabled = false;
+    // ⭐ v3.1 : 버튼 활성화를 지도 그리기보다 "먼저"
+    $('btnTmap').disabled     = false;
     $('btnTmapGoal').disabled = false;
+
+    let mapNote = '';
+
+    try {
+      drawMap(res);
+    } catch (mapErr) {
+      $('map').style.display = 'none';
+      mapNote = '<div class="meta" style="margin-top:6px">⚠️ 지도 표시 실패: '
+        + esc(mapErr.message) + ' (아래 순서와 티맵 버튼은 정상 동작합니다)</div>';
+    }
+
+    renderOrder(res, mapNote);
+
+    try { $('resultCard').scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) {}
 
   } catch (err) {
     showResult('❌ ' + esc(err.message), 'err');
@@ -628,10 +905,32 @@ $('btnRun').addEventListener('click', async function () {
   }
 });
 
+function syncResultGeoToRows(res) {
+  (res.geocoded || []).forEach(function (g) {
+    const target = ROWS.find(function (r) {
+      return ((r.name || '').trim() || '이름없음') === (g.name || '')
+          && (r.address || '').trim() === (g.address || '');
+    });
+    if (target) {
+      target.geo = {
+        ok: g.ok, lat: g.lat, lng: g.lng, source: g.source,
+        matchFlag: g.matchFlag || '', matchQuality: g.matchQuality || '',
+        matched: g.matched || '', cached: g.cached || false
+      };
+      updateRowStatus(target.id);
+    }
+  });
+}
+
 /* ============================================================================
-   ⚙️ 9. 지도 / 결과 출력
+   ⚙️ 10. 지도 / 결과 출력
    ============================================================================ */
 function drawMap(res) {
+
+  // ⭐ v3.1 : Leaflet 미로딩 시에도 앱이 죽지 않도록 방어
+  if (typeof L === 'undefined') {
+    throw new Error('지도 라이브러리(Leaflet)를 불러오지 못했습니다.');
+  }
 
   $('map').style.display = 'block';
 
@@ -646,19 +945,16 @@ function drawMap(res) {
   if (mapLayer) { map.removeLayer(mapLayer); }
   mapLayer = L.layerGroup().addTo(map);
 
-  // 경로선
+  const bounds = [];
+
   if (res.points && res.points.length) {
     L.polyline(res.points, { color: '#2563eb', weight: 5, opacity: .8 }).addTo(mapLayer);
   }
 
-  const bounds = [];
-
-  // 출발
   L.marker([res.start.lat, res.start.lng])
     .addTo(mapLayer).bindPopup('<b>출발</b><br>' + esc(res.start.name));
   bounds.push([res.start.lat, res.start.lng]);
 
-  // 최적화된 경유지
   (res.order || []).forEach(function (v, i) {
     L.marker([v.lat, v.lng]).addTo(mapLayer)
       .bindPopup('<b>' + (i + 1) + '번 경유</b><br>' + esc(v.name)
@@ -666,42 +962,57 @@ function drawMap(res) {
     bounds.push([v.lat, v.lng]);
   });
 
-  // 목적지
   L.marker([res.goal.lat, res.goal.lng]).addTo(mapLayer)
-    .bindPopup('<b>★ 목적지</b><br>' + esc(res.goal.name));
+    .bindPopup('<b>★ 목적지</b><br>' + esc(res.goal.name)
+      + (res.goal.address ? '<br>' + esc(res.goal.address) : ''));
   bounds.push([res.goal.lat, res.goal.lng]);
 
   if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
   setTimeout(function () { map.invalidateSize(); }, 120);
 }
 
-function renderOrder(res) {
+function renderOrder(res, mapNote) {
 
-  const km = (res.totalDistanceM || 0) / 1000;
+  const km  = (res.totalDistanceM || 0) / 1000;
   const min = Math.round((res.totalTimeSec || 0) / 60);
 
-  let html = '<b>✅ 최적화 완료</b><br>'
-    + '· 총 거리: <b>' + km.toFixed(1) + ' km</b> · 예상 시간: <b>'
-    + Math.floor(min / 60) + '시간 ' + (min % 60) + '분</b><br>'
-    + '<ul class="olist">'
+  let head = '<b>' + (res.single ? '✅ 목적지 경로 준비 완료 (경유지 최적화 생략)'
+                                  : '✅ 경유지 순서 최적화 완료') + '</b><br>';
+
+  if (km > 0) {
+    head += '· 총 거리: <b>' + km.toFixed(1) + ' km</b> · 예상 시간: <b>'
+      + Math.floor(min / 60) + '시간 ' + (min % 60) + '분</b><br>';
+  } else if (res.single) {
+    head += '· 실경로 정보를 받지 못해 직선으로 표시했습니다.<br>';
+  }
+
+  head += '· 입력 ' + ((res.geocoded || []).length) + '곳 · 지도 점 '
+    + ((res.points || []).length) + '개<br>';
+
+  let html = head + '<ul class="olist">'
     + '<li><span class="pin" style="background:#2563eb">출</span>'
       + esc(res.start.name) + '</li>';
 
   (res.order || []).forEach(function (v, i) {
     html += '<li><span class="pin">' + (i + 1) + '</span>' + esc(v.name)
-      + (v.address ? '<span class="meta" style="margin-left:auto">'
-          + esc(v.address) + '</span>' : '') + '</li>';
+      + (v.address ? '<span class="meta" style="margin-left:auto">' + esc(v.address) + '</span>' : '')
+      + '</li>';
   });
 
   html += '<li><span class="pin" style="background:#dc2626">★</span>'
-    + esc(res.goal.name) + ' <span class="meta" style="margin-left:auto">목적지</span></li>'
+    + esc(res.goal.name)
+    + (res.goal.matchQuality ? '<span class="badge b-warn" style="margin-left:6px">'
+        + esc(res.goal.matchQuality) + '</span>' : '')
+    + '<span class="meta" style="margin-left:auto">목적지</span></li>'
     + '</ul>';
+
+  if (mapNote) html += mapNote;
 
   showResult(html, 'ok');
 }
 
 /* ============================================================================
-   ⚙️ 10. 티맵 앱 딥링크
+   ⚙️ 11. 티맵 앱 딥링크
    ============================================================================ */
 function buildTmapUrl(includeVias) {
 
@@ -712,7 +1023,6 @@ function buildTmapUrl(includeVias) {
     + '&goalx=' + RESULT.goal.lng
     + '&goaly=' + RESULT.goal.lat;
 
-  // 경유지 (rV1Name / rV1X / rV1Y 규약 — 기기에서 동작 확인 필요)
   if (includeVias) {
     (RESULT.order || []).forEach(function (v, i) {
       const n = i + 1;
@@ -735,7 +1045,7 @@ $('btnTmapGoal').addEventListener('click', function () {
 });
 
 /* ============================================================================
-   ⚙️ 11. 기타 버튼 / 초기화
+   ⚙️ 12. 기타 버튼 / 초기화
    ============================================================================ */
 $('btnAdd').addEventListener('click', function () { addRow(); });
 
@@ -748,17 +1058,13 @@ $('btnClear').addEventListener('click', function () {
   addRow();
 });
 
-// 초기 행 3개 생성 (최소 사용 흐름)
-addRow();
 addRow();
 addRow();
 
-// 거래처 목록 자동 로드 + 연결 자가진단
 (async function init() {
   await loadClients();
 })();
 
-// 서비스 워커 (선택 — 없으면 무시됨)
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js').catch(function () {});
 }
