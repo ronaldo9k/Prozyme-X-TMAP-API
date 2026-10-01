@@ -1,19 +1,12 @@
 {
-  "name": "푸로찜에스 티맵 배송 경로 도우미",
+  "name": "푸로찜에스 티맵 경로 최적화",
   "short_name": "티맵경로 최적화",
-  "description": "노션 거래처·주소 자동 연동 → 경로 최적화 → 티맵 앱 이동",
+  "description": "노션 거래처 연동 · 카카오 실시간 경로 확인 · 티맵 주행 지원",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f1f5f9",
-  "theme_color": "#0f172a",
-  "lang": "ko",
-  "dir": "ltr",
-  "categories": ["business", "navigation", "productivity"],
-  "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+  "background_color": "#05070b",
+  "theme_color": "#05070b",
+  "lang": "ko"
 }
-
