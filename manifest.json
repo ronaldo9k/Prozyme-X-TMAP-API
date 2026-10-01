@@ -1,16 +1,28 @@
 {
-  "name": "푸로찜에스 티맵 경로 최적화",
-  "short_name": "티맵경로최적화",
-  "description": "노션 거래처 주소로 티맵 경유지 최적화 경로를 계산하는 배송 도우미",
-  "lang": "ko",
-  "start_url": "./",
+  "name": "푸로찜에스 티맵 배송 경로 도우미",
+  "short_name": "티맵경로 최적화",
+  "description": "노션 거래처·주소 자동 연동 → 경유지 순서 최적화 → 티맵 앱 이동",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#05070b",
-  "theme_color": "#05070b",
+  "background_color": "#f1f5f9",
+  "theme_color": "#0f172a",
+  "lang": "ko",
+  "dir": "ltr",
+  "categories": ["business", "navigation", "productivity"],
   "icons": [
-    { "src": "./icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "./icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
