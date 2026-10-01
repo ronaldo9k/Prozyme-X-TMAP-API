@@ -1,597 +1,767 @@
 <!DOCTYPE html>
-
 <html lang="ko">
-
 <head>
-
-  <meta charset="UTF-8">
-
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#05070b">
-
-  <link rel="manifest" href="./manifest.json">
-
-  <!-- ⭐ 티맵 JS SDK : 지도 '그리기 전용'. 여기에 앱키 필요 (SDK 구조상 노출 필수)
-       → 가급적 지도 표시 전용 앱키를 별도로 발급해서 넣어주세요 -->
-  <script src="https://apis.openapi.sk.com/tmap/jsv2?appKey=여기에_지도용_앱키"></script>
-
-  <title>푸로찜에스 티맵 경로 최적화</title>
-
-  <style>
-
-    :root {
-      --bg: #05070b;
-      --card: rgba(10,15,25,.55);
-      --muted: #6b7280;
-      --green: #22c55e;
-      --red: #ef4444;
-      --gold: #c9a227;
-      --blue: #60a5fa;
-    }
-
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background-color: var(--bg);
-      /* ⭐ 배경 이미지 1 : bg1.png (전체 고정 배경) */
-      background-image: url('./bg1.png');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      background-attachment: fixed;
-      padding: 0 14px 40px;
-      font-family: -apple-system, BlinkMacSystemFont,
-        "Segoe UI", "Noto Sans KR", sans-serif;
-      color: #f9fafb;
-    }
-
-    .hero {
-      height: 210px;
-      border-radius: 0 0 30px 30px;
-      overflow: hidden;
-      position: relative;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      margin: 0 -14px 16px;
-    }
-
-    .hero::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      /* ⭐ 배경 이미지 2 : bg2.png (상단 히어로) */
-      background-image: url('./bg2.png');
-      background-size: cover;
-      background-position: center;
-    }
-
-    .hero::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to top, rgba(5,7,11,.94), rgba(5,7,11,.12));
-    }
-
-    .hero-content { position: relative; z-index: 2; width: 100%; text-align: center; padding: 0 28px 26px; }
-
-    .hero-title {
-      font-size: 25px; font-weight: 950; letter-spacing: -1.2px;
-      color: white; text-shadow: 0 3px 15px rgba(0,0,0,.7);
-    }
-
-    .hero-sub {
-      margin-top: 8px; font-size: 13px; font-weight: 700; color: #e5e7eb;
-      text-shadow: 0 2px 10px rgba(0,0,0,.8);
-    }
-
-    .card {
-      background: var(--card);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border: 1px solid rgba(229,231,235,.14);
-      border-radius: 22px;
-      padding: 16px 14px;
-      margin-bottom: 14px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.45);
-    }
-
-    .card-title { font-size: 13px; font-weight: 800; color: var(--gold); margin-bottom: 10px; }
-
-    .stop-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-
-    .stop-badge {
-      flex: 0 0 26px; height: 26px; border-radius: 50%;
-      background: var(--gold); color: #111827;
-      font-size: 13px; font-weight: 900;
-      display: flex; align-items: center; justify-content: center;
-    }
-
-    .stop-badge.goal { background: var(--green); color: white; }
-
-    .stop-fields { flex: 1; min-width: 0; }
-
-    .stop-fields input {
-      width: 100%; border: 1px solid rgba(229,231,235,.2);
-      background: rgba(5,7,11,.6); color: #f9fafb;
-      border-radius: 12px; padding: 9px 12px;
-      font-size: 14px; margin-bottom: 5px; outline: none;
-    }
-
-    .stop-fields input:focus { border-color: var(--gold); }
-    .stop-fields input.addr { font-size: 12px; color: #cbd5e1; }
-
-    .btn-clear {
-      flex: 0 0 30px; height: 30px; border: none; border-radius: 10px;
-      background: rgba(239,68,68,.16); color: #fca5a5;
-      font-size: 15px; cursor: pointer;
-    }
-
-    .btn {
-      width: 100%; border: none; border-radius: 16px;
-      padding: 14px; font-size: 15px; font-weight: 800;
-      cursor: pointer; margin-bottom: 8px;
-    }
-
-    .btn-main { background: linear-gradient(135deg, #c9a227, #e0b52c); color: #111827; }
-
-    .btn-ghost {
-      background: rgba(229,231,235,.08); color: #e5e7eb;
-      border: 1px solid rgba(229,231,235,.18);
-    }
-
-    .btn:disabled { opacity: .45; }
-
-    .status { font-size: 12px; color: #9ca3af; margin-top: 6px; white-space: pre-wrap; word-break: keep-all; }
-    .fail { color: #fca5a5; }
-    .ok-msg { color: #86efac; }
-
-    .order-item {
-      display: flex; align-items: flex-start; gap: 8px;
-      font-size: 13px; padding: 6px 0;
-      border-bottom: 1px dashed rgba(229,231,235,.12);
-    }
-
-    .order-num {
-      flex: 0 0 22px; height: 22px; border-radius: 50%;
-      background: var(--gold); color: #111827; font-size: 12px; font-weight: 900;
-      display: flex; align-items: center; justify-content: center;
-    }
-
-    .order-num.start { background: var(--green); color: white; }
-    .order-num.goal { background: var(--red); color: white; }
-
-    .order-name { font-weight: 700; }
-    .order-addr { font-size: 11px; color: #9ca3af; }
-
-    .summary {
-      margin-top: 10px; font-size: 13px; font-weight: 800; color: var(--blue);
-    }
-
-    #map { width: 100%; height: 340px; border-radius: 16px; display: none; }
-
-    .deeplink {
-      margin-top: 10px; font-size: 11px; color: #93c5fd;
-      word-break: break-all; display: none;
-    }
-
-    .warn { font-size: 11px; color: #fbbf24; margin-top: 8px; }
-
-  </style>
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>푸로찜에스 티맵 경로 도우미 v3.0</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --bg:#0f172a; --card:#ffffff; --line:#e2e8f0; --txt:#0f172a;
+    --muted:#64748b; --brand:#2563eb; --ok:#16a34a; --warn:#f59e0b; --err:#dc2626;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;background:#f1f5f9;color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",
+      "Noto Sans KR",Roboto,sans-serif;
+    padding-bottom:24px;
+  }
+  header{
+    background:var(--bg);color:#fff;padding:16px 16px 14px;
+    position:sticky;top:0;z-index:1000;box-shadow:0 2px 10px rgba(0,0,0,.18);
+  }
+  header h1{margin:0;font-size:17px;letter-spacing:-.3px}
+  header p{margin:4px 0 0;font-size:12px;color:#94a3b8}
+  .hrow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .wrap{padding:12px;max-width:900px;margin:0 auto}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(15,23,42,.05);
+  }
+  .card h2{margin:0 0 10px;font-size:14px;color:#334155}
+  .btn{
+    border:0;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:600;
+    cursor:pointer;background:var(--brand);color:#fff;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn.ghost{background:#fff;color:#334155;border:1px solid var(--line)}
+  .btn.small{padding:7px 10px;font-size:12px;border-radius:8px}
+  .btn.tmap{background:#e11d48}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .row{
+    display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:start;
+    border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;
+    background:#fbfdff;
+  }
+  .row.goal{background:#fff7ed;border-color:#fed7aa}
+  .num{
+    width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;
+  }
+  .row.goal .num{background:#ea580c}
+  .f{display:flex;flex-direction:column;gap:6px}
+  input[type=text]{
+    width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;
+    font-size:14px;background:#fff;color:var(--txt);
+  }
+  input[type=text]:focus{outline:2px solid #bfdbfe;border-color:var(--brand)}
+  .acts{display:flex;flex-direction:column;gap:6px}
+  .badge{font-size:11px;font-weight:700;padding:3px 7px;border-radius:999px;display:inline-block}
+  .b-ok{background:#dcfce7;color:#15803d}
+  .b-err{background:#fee2e2;color:#b91c1c}
+  .b-cache{background:#e0e7ff;color:#3730a3}
+  .b-wait{background:#f1f5f9;color:#64748b}
+  .meta{font-size:11px;color:var(--muted);word-break:break-all;line-height:1.5}
+  #map{height:340px;border-radius:12px;display:none;margin-bottom:12px}
+  .msg{
+    font-size:13px;padding:11px 12px;border-radius:10px;white-space:pre-wrap;
+    line-height:1.6;word-break:break-word;
+  }
+  .msg.err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+  .msg.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+  .msg.info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .legend{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
+  details{margin-top:8px}
+  details summary{cursor:pointer;font-size:12px;color:var(--brand);font-weight:600}
+  pre{
+    background:#0f172a;color:#a5f3fc;padding:10px;border-radius:8px;
+    font-size:11px;overflow:auto;max-height:240px;white-space:pre-wrap;word-break:break-all;
+  }
+  .olist{list-style:none;padding:0;margin:6px 0 0}
+  .olist li{
+    display:flex;gap:8px;align-items:center;font-size:13px;padding:7px 0;
+    border-bottom:1px dashed var(--line);
+  }
+  .olist li:last-child{border-bottom:0}
+  .pin{
+    width:22px;height:22px;border-radius:50%;background:#ea580c;color:#fff;
+    font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
+    flex:0 0 auto;
+  }
+  .hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6}
+</style>
 </head>
-
 <body>
 
-  <div class="hero">
-    <div class="hero-content">
-      <div class="hero-title">🚚 배송 경로 최적화</div>
-      <div class="hero-sub">푸로찜에스 · 티맵 경유지 최적화 API 연동</div>
+<header>
+  <div class="hrow">
+    <div>
+      <h1>🚗 푸로찜에스 티맵 경로 도우미 <span style="color:#60a5fa">v3.0</span></h1>
+      <p>노션 거래처 · 주소 자동 연동 → 경유지 최적화 → 티맵 이동</p>
+    </div>
+    <button class="btn ghost small" id="btnTest">🔗 연결테스트</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>🚩 출발지 (현재 위치)</h2>
+    <div class="f">
+      <input type="text" id="startName" placeholder="출발지 이름 (예: 현재위치 / 본사)">
+      <div class="toolbar">
+        <button class="btn small" id="btnGps">📍 내 위치 가져오기</button>
+        <button class="btn ghost small" id="btnStartManual">✏️ 주소로 지정</button>
+      </div>
+      <input type="text" id="startAddr" placeholder="출발지 주소 (비우면 서울시청 기본값)" style="display:none">
+      <div class="meta" id="startMeta">GPS 미사용 시 기본값: 서울시청 (37.566826, 126.9786567)</div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-title">🛑 경유지 5곳 + 🏁 목적지 1곳 (마지막 줄이 목적지로 고정)</div>
-    <div id="stop-list"></div>
-    <datalist id="client-list"></datalist>
-  </div>
-
-  <div class="card">
-    <button class="btn btn-main" id="btn-go">⚡ 경로 최적화 후 지도 표시</button>
-    <button class="btn btn-ghost" id="btn-loc">📍 현재 위치 확인</button>
-    <button class="btn btn-ghost" id="btn-reset">🧹 모두 지우기</button>
-    <div class="status" id="status">
-      거래처를 선택하거나 주소를 직접 입력하세요.
-      마지막 줄 = 최종 목적지(고정), 나머지는 경유지로 티맵이 가장 빠른 순서를 계산합니다.
+    <h2>📍 배송지 입력 (최대 6곳 · ★ = 최종 목적지)</h2>
+    <div id="rows"></div>
+    <div class="toolbar">
+      <button class="btn small" id="btnAdd">＋ 배송지 추가</button>
+      <button class="btn ghost small" id="btnClear">전체 지우기</button>
     </div>
-    <div class="warn">⏱️ 티맵 경유지 최적화 무료 한도: 하루 50건 · 주소 좌표는 서버에 캐시되어 재검색하지 않습니다.</div>
-  </div>
-
-  <div class="card" id="result-card" style="display:none">
-    <div class="card-title">✅ 최적화된 배송 순서</div>
-    <div id="order-list"></div>
-    <div class="summary" id="summary"></div>
+    <div class="hint">
+      거래처명을 입력하면 노션 주소가 자동으로 채워집니다. 노션에 없는 주소는 <b>주소칸에 직접 입력</b>하세요.
+      ★ 버튼으로 최종 목적지를 지정합니다(1곳 필수).
+    </div>
   </div>
 
   <div class="card">
-    <div id="map"></div>
-    <div class="deeplink" id="deeplink"></div>
-    <button class="btn btn-ghost" id="btn-tmap" style="display:none">🚗 최적화 순서대로 티맵 앱 열기</button>
+    <h2>🚀 실행</h2>
+    <div class="toolbar">
+      <button class="btn" id="btnRun" style="flex:1">🚀 경로 최적화 후 지도표시</button>
+    </div>
+    <div class="toolbar" style="margin-top:8px">
+      <button class="btn tmap" id="btnTmap" disabled style="flex:1">📱 티맵 앱으로 열기</button>
+      <button class="btn ghost small" id="btnTmapGoal" disabled>목적지만 열기</button>
+    </div>
+    <div class="legend">
+      · <b>티맵 앱으로 열기</b>는 최적화된 경유지 순서를 티맵에 전달합니다.<br>
+      · 기기/티맵 버전에 따라 경유지 전달이 안 되면 <b>목적지만 열기</b>를 사용한 뒤 경유지 순서를 참고하세요.
+    </div>
   </div>
 
-  <script>
+  <div id="map"></div>
 
-    // ============================================================
-    // ⭐ 본인 GAS 웹앱 URL을 여기에 붙여넣어주세요
-    // ============================================================
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycby4FeUlAdDngdi5LvEDH_d0B3M989Do6hEvLN3In5mXPg_QloOOuEMZSx3AfZcjrMkk/exec';
+  <div class="card" id="resultCard" style="display:none">
+    <h2>📋 결과</h2>
+    <div id="result"></div>
+  </div>
 
-    const STORE_ANDROID_HTTP =
-      'https://play.google.com/store/apps/details?id=com.skt.tmap.ku';
-    const STORE_IOS =
-      'https://apps.apple.com/kr/app/id431589174';
+</div>
 
-    const MAX_STOPS = 6;          // 경유지 5 + 목적지 1
-    const DEFAULT_CENTER = { lat: 37.566826, lng: 126.9786567 };  // 서울 시청
+<script>
+/* ============================================================================
+   ⚙️ 1. 설정 — 여기만 수정하세요
+   ============================================================================ */
+const GAS_URL =
+  'https://script.google.com/macros/s/AKfycbzQRb2mZct2AmolqCYQS9TfXoC7RqgI_aumJdt-RKd6asqy7mfapE6MAjuv9nIILEyduA/exec';
+const MAX_ROWS = 6;
 
-    let clients = [];
-    let clientMap = {};
-    let myLocation = null;
-    let map = null;
-    let markers = [];
-    let polylines = [];
-    let lastResult = null;
+let CLIENTS   = [];   // 노션 거래처 목록
+let ROWS      = [];   // 화면 행 모델
+let START     = { name: '현재위치', lat: 37.566826, lng: 126.9786567, manual: false };
+let RESULT    = null; // optimroute 결과
+let map       = null;
+let mapLayer  = null;
 
-    // ────────────── 입력 행 ──────────────
-    function buildRows() {
-      const list = document.getElementById('stop-list');
-      list.innerHTML = '';
+/* ============================================================================
+   ⚙️ 2. GAS 호출 (JSONP — GitHub Pages 크로스도메인 100% 안전)
+   ============================================================================ */
+let jsonpSeq = 0;
 
-      for (let i = 0; i < MAX_STOPS; i++) {
+function callApi(payload, timeoutMs) {
+  timeoutMs = timeoutMs || 60000;
 
-        const isGoal = (i === MAX_STOPS - 1);
-        const row = document.createElement('div');
-        row.className = 'stop-row';
+  return new Promise(function (resolve, reject) {
 
-        row.innerHTML =
-          '<div class="stop-badge ' + (isGoal ? 'goal' : '') + '">' +
-            (isGoal ? '🏁' : (i + 1)) + '</div>' +
-          '<div class="stop-fields">' +
-            '<input list="client-list" class="name" placeholder="' +
-              (isGoal ? '최종 목적지 거래처' : '경유지 ' + (i + 1) + ' 거래처') + '">' +
-            '<input class="addr" placeholder="도로명주소 (자동 입력 / 직접 입력 가능)">' +
-          '</div>' +
-          '<button class="btn-clear">✕</button>';
+    const cb  = '__gas_cb_' + (++jsonpSeq) + '_' + Date.now();
+    const url = GAS_URL +
+      '?action='  + encodeURIComponent(payload.action) +
+      '&payload=' + encodeURIComponent(JSON.stringify(payload)) +
+      '&callback=' + cb;
 
-        const nameInput = row.querySelector('.name');
-        const addrInput = row.querySelector('.addr');
+    const script = document.createElement('script');
+    let done = false;
 
-        nameInput.addEventListener('change', function() {
-          const found = clientMap[nameInput.value.trim()];
-          if (found) addrInput.value = found;
-        });
+    const timer = setTimeout(function () {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error('응답 시간 초과 — GAS 배포 URL과 "액세스 권한: 모든 사용자"를 확인하세요.'));
+    }, timeoutMs);
 
-        row.querySelector('.btn-clear').addEventListener('click', function() {
-          nameInput.value = '';
-          addrInput.value = '';
-        });
-
-        list.appendChild(row);
-
-      }
+    function cleanup() {
+      clearTimeout(timer);
+      try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
     }
 
-    // ────────────── GAS 호출 ──────────────
-    function callGas(payload) {
-      return fetch(GAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      }).then(function(r) { return r.json(); });
-    }
+    window[cb] = function (res) {
+      if (done) return;
+      done = true;
+      cleanup();
+      resolve(res);
+    };
 
-    function setStatus(text, cls) {
-      const el = document.getElementById('status');
-      el.textContent = text;
-      el.className = 'status ' + (cls || '');
-    }
+    script.onerror = function () {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error('GAS 호출 실패 — 배포 URL / 웹앱 권한(모든 사용자) 확인'));
+    };
 
-    // ────────────── 초기화 : 거래처 목록 ──────────────
-    function loadClients() {
+    script.src = url;
+    document.head.appendChild(script);
+  });
+}
 
-      setStatus('⏳ 노션 거래처 목록을 불러오는 중…');
+/* ============================================================================
+   ⚙️ 3. UI 유틸
+   ============================================================================ */
+const $ = function (id) { return document.getElementById(id); };
+const esc = function (s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+};
 
-      callGas({ action: 'getclients' })
-        .then(function(res) {
+function showResult(html, cls) {
+  $('resultCard').style.display = 'block';
+  $('result').innerHTML = (cls ? '<div class="msg ' + cls + '">' : '<div>')
+    + html + '</div>';
+}
 
-          if (!res.ok) { setStatus('❌ ' + res.error, 'fail'); return; }
+/* ============================================================================
+   ⚙️ 4. 행 렌더링
+   ============================================================================ */
+function addRow(prefill) {
+  if (ROWS.length >= MAX_ROWS) { alert('최대 ' + MAX_ROWS + '곳까지 입력할 수 있습니다.'); return; }
+  ROWS.push({
+    id: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    name:    (prefill && prefill.name)    || '',
+    address: (prefill && prefill.address) || '',
+    isGoal:  (prefill && prefill.isGoal)  || false,
+    geo:     null
+  });
+  if (!ROWS.some(function (r) { return r.isGoal; })) ROWS[ROWS.length - 1].isGoal = true;
+  renderRows();
+}
 
-          clients = res.clients || [];
-          const dl = document.getElementById('client-list');
-          dl.innerHTML = '';
+function removeRow(id) {
+  const wasGoal = (ROWS.find(function (r) { return r.id === id; }) || {}).isGoal;
+  ROWS = ROWS.filter(function (r) { return r.id !== id; });
+  if (wasGoal && ROWS.length) ROWS[ROWS.length - 1].isGoal = true;
+  renderRows();
+}
 
-          clients.forEach(function(c) {
-            clientMap[c.name] = c.address;
-            const opt = document.createElement('option');
-            opt.value = c.name;
-            dl.appendChild(opt);
-          });
+function setGoal(id) {
+  ROWS.forEach(function (r) { r.isGoal = (r.id === id); });
+  renderRows();
+}
 
-          setStatus('✅ 거래처 ' + clients.length + '곳 로드 완료 (' +
-            new Date().toLocaleTimeString('ko-KR') + ')', 'ok-msg');
+function renderRows() {
 
-        })
-        .catch(function(err) {
-          setStatus('❌ GAS 연결 실패 : ' + err + ' — GAS_URL 확인', 'fail');
-        });
+  const html = ROWS.map(function (r, i) {
 
-    }
+    const badge = r.geo
+      ? (r.geo.ok
+          ? '<span class="badge ' + (r.geo.cached ? 'b-cache' : 'b-ok') + '">'
+              + (r.geo.cached ? '캐시' : '좌표 OK')
+              + (r.geo.source ? ' · ' + esc(r.geo.source) : '') + '</span>'
+          : '<span class="badge b-err">좌표 실패</span>')
+      : '<span class="badge b-wait">미확인</span>';
 
-    // ────────────── 현재 위치 ──────────────
-    document.getElementById('btn-loc').addEventListener('click', function() {
+    const meta = r.geo
+      ? '<div class="meta">'
+          + (r.geo.ok
+              ? '✅ ' + r.geo.lat.toFixed(6) + ', ' + r.geo.lng.toFixed(6)
+                + (r.geo.matched ? ' · ' + esc(r.geo.matched) : '')
+              : '❌ ' + esc(r.geo.reason || '실패')
+                + (r.geo.cleanAddress ? '<br>정제된 주소: "' + esc(r.geo.cleanAddress) + '"' : ''))
+          + '</div>'
+      : '';
 
-      if (!navigator.geolocation) {
-        setStatus('❌ 위치 기능 미지원 — 서울 기본 위치로 진행합니다.', 'fail');
-        return;
-      }
+    return ''
+      + '<div class="row' + (r.isGoal ? ' goal' : '') + '">'
+      +   '<div class="num">' + (r.isGoal ? '★' : (i + 1)) + '</div>'
+      +   '<div class="f">'
+      +     '<input type="text" list="clientList" data-id="' + r.id + '" data-k="name"'
+      +       ' placeholder="거래처명 (노션 자동완성)" value="' + esc(r.name) + '">'
+      +     '<input type="text" data-id="' + r.id + '" data-k="address"'
+      +       ' placeholder="주소 (자동 입력 · 직접 수정 가능)" value="' + esc(r.address) + '">'
+      +     badge + meta
+      +   '</div>'
+      +   '<div class="acts">'
+      +     '<button class="btn ghost small" data-a="goal"  data-id="' + r.id + '">★ 목적지</button>'
+      +     '<button class="btn ghost small" data-a="check" data-id="' + r.id + '">📍 주소확인</button>'
+      +     '<button class="btn ghost small" data-a="diag"  data-id="' + r.id + '">🔍 원인진단</button>'
+      +     '<button class="btn ghost small" data-a="del"   data-id="' + r.id + '">삭제</button>'
+      +   '</div>'
+      + '</div>';
+  }).join('');
 
-      setStatus('⏳ 현재 위치 확인 중…');
+  $('rows').innerHTML = html || '<div class="meta">배송지를 추가하세요.</div>';
+}
 
-      navigator.geolocation.getCurrentPosition(
-        function(pos) {
-          myLocation = {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-          };
-          setStatus('📍 출발지(현재위치) 확인: ' +
-            myLocation.lat.toFixed(5) + ', ' + myLocation.lng.toFixed(5), 'ok-msg');
-        },
-        function() {
-          myLocation = null;
-          setStatus('⚠️ 위치 확인 실패 — 기본 위치(서울 시청)에서 최적화합니다.', 'fail');
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
+// 이벤트 위임
+$('rows').addEventListener('input', function (ev) {
+  const t = ev.target;
+  if (!t.dataset || !t.dataset.id) return;
+
+  const row = ROWS.find(function (r) { return r.id === t.dataset.id; });
+  if (!row) return;
+
+  if (t.dataset.k === 'name') {
+    row.name = t.value;
+    // ⭐ 거래처명이 노션 목록과 일치하면 주소 자동 채움
+    const norm = normalizeName(t.value);
+    const hit = CLIENTS.find(function (c) { return c.norm === norm; })
+             || CLIENTS.find(function (c) { return c.norm && norm && c.norm.indexOf(norm) === 0; });
+    if (hit && hit.address) {
+      row.address = hit.address;
+      const addrInput = document.querySelector(
+        'input[data-id="' + row.id + '"][data-k="address"]'
       );
+      if (addrInput) addrInput.value = hit.address;
+    }
+    row.geo = null;
+  }
 
+  if (t.dataset.k === 'address') {
+    row.address = t.value;
+    row.geo = null;
+  }
+});
+
+$('rows').addEventListener('click', function (ev) {
+  const btn = ev.target.closest('button[data-a]');
+  if (!btn) return;
+
+  const id  = btn.dataset.id;
+  const act = btn.dataset.a;
+
+  if (act === 'del')   { removeRow(id); return; }
+  if (act === 'goal')  { setGoal(id);   return; }
+  if (act === 'check') { checkOne(id);  return; }
+  if (act === 'diag')  { diagnoseOne(id); return; }
+});
+
+function normalizeName(t) {
+  return String(t || '')
+    .toLowerCase()
+    .replace(/[\s\u00a0]+/g, '')
+    .replace(/\(주\)|주식회사|\(유\)|유한회사|㈜|co\.?ltd\.?/gi, '')
+    .replace(/[^가-힣a-z0-9]/g, '');
+}
+
+/* ============================================================================
+   ⚙️ 5. 단건 좌표 확인 / 원인 진단
+   ============================================================================ */
+async function checkOne(id) {
+
+  const row = ROWS.find(function (r) { return r.id === id; });
+  if (!row) return;
+
+  if (!row.name && !row.address) { alert('거래처명 또는 주소를 입력하세요.'); return; }
+
+  showResult('⏳ 좌표 확인 중…', 'info');
+
+  try {
+    const res = await callApi({
+      action: 'geocode',
+      stops: [{ name: row.name, address: row.address }]
     });
 
-    // ────────────── 입력 수집 ──────────────
-    function collectStops() {
-      const rows = document.querySelectorAll('.stop-row');
-      const stops = [];
-      rows.forEach(function(row) {
-        const name = row.querySelector('.name').value.trim();
-        const addr = row.querySelector('.addr').value.trim();
-        if (name || addr) stops.push({ name: name || addr, address: addr });
-      });
-      return stops;
+    const g = (res.results || [])[0];
+    row.geo = g;
+    renderRows();
+
+    if (g && g.ok) {
+      showResult(
+        '✅ <b>' + esc(row.name || '(이름없음)') + '</b> 좌표 확보<br>'
+        + '· 위도/경도: ' + g.lat.toFixed(6) + ', ' + g.lng.toFixed(6) + '<br>'
+        + '· 사용된 방식: ' + esc(g.source || '-') + '<br>'
+        + (g.matched ? '· 매칭 주소: ' + esc(g.matched) : ''),
+        'ok'
+      );
+    } else {
+      showResult(
+        '❌ <b>' + esc(row.name || '(이름없음)') + '</b> 좌표 변환 실패<br>'
+        + '· 사유: ' + esc((g && g.reason) || '알 수 없음') + '<br>'
+        + (g && g.cleanAddress ? '· 정제된 주소: "' + esc(g.cleanAddress) + '"<br>' : '')
+        + '→ <b>🔍 원인진단</b> 버튼으로 TMAP 원본 응답을 확인하세요.',
+        'err'
+      );
     }
+  } catch (err) {
+    showResult('❌ ' + esc(err.message), 'err');
+  }
+}
 
-    // ────────────── 경로 최적화 실행 ──────────────
-    document.getElementById('btn-go').addEventListener('click', function() {
+async function diagnoseOne(id) {
 
-      const stops = collectStops();
+  const row = ROWS.find(function (r) { return r.id === id; });
+  if (!row) return;
 
-      if (stops.length === 0) {
-        setStatus('❌ 최소 1곳(목적지) 이상 입력해주세요.', 'fail');
-        return;
-      }
+  showResult('⏳ 진단 중… (TMAP 원본 응답 수집)', 'info');
 
-      const btn = document.getElementById('btn-go');
-      btn.disabled = true;
-      setStatus('⏳ 주소 변환 → 티맵 경유지 최적화 요청 중… (하루 50건 한도 소모)');
+  try {
+    const res = await callApi({ action: 'diagnose', name: row.name, address: row.address });
 
-      callGas({
-        action: 'optimroute',
-        start: myLocation || { lat: DEFAULT_CENTER.lat, lng: DEFAULT_CENTER.lng,
-                               name: myLocation ? '현재위치' : '기본위치' },
-        stops: stops
-      })
-      .then(function(res) {
+    if (!res.ok) { showResult('❌ ' + esc(res.error), 'err'); return; }
 
-        btn.disabled = false;
+    let html = '<b>🔍 ' + esc(row.name || '(이름없음)') + ' 진단 결과</b><br>'
+      + '· 입력 주소: "' + esc(res.input.address || '(없음)') + '"<br>'
+      + '· 정제 주소: "' + esc(res.cleaned.address || '(없음)') + '"<br>'
+      + '· 주소 형태 판정: ' + (res.looksLikeAddress ? '주소로 인정 ✅' : '주소 아님 ❌ (상호명으로 판단)') + '<br>'
+      + '· TMAP 시도 횟수: ' + res.attempts.length + '회<hr>';
 
-        if (!res.ok) { setStatus('❌ ' + res.error, 'fail'); return; }
-
-        lastResult = res;
-        renderResult(res);
-        drawMap(res);
-        buildDeeplink(res);
-
-        setStatus('✅ 최적화 완료! 아래 순서와 지도를 확인하세요.', 'ok-msg');
-
-      })
-      .catch(function(err) {
-        btn.disabled = false;
-        setStatus('❌ 요청 실패 : ' + err, 'fail');
-      });
-
+    res.attempts.forEach(function (a) {
+      html += '<b>[' + esc(a.method) + '] HTTP ' + esc(a.httpCode)
+        + (a.ok ? ' → ✅ 성공 ' + a.lat + ', ' + a.lng : ' → ❌ 실패') + '</b>'
+        + '<details><summary>원본 응답 보기</summary><pre>'
+        + esc(a.raw) + '</pre></details>';
     });
 
-    // ────────────── 결과 표시 ──────────────
-    function renderResult(res) {
+    showResult(html, res.attempts.some(function(a){return a.ok;}) ? 'ok' : 'err');
 
-      document.getElementById('result-card').style.display = 'block';
+    // 성공한 시도가 있으면 행 상태 갱신
+    const good = res.attempts.find(function (a) { return a.ok; });
+    if (good) {
+      row.geo = { ok: true, lat: good.lat, lng: good.lng, source: good.method,
+                  matched: good.matchedAddress || '' };
+      renderRows();
+    }
 
-      const list = document.getElementById('order-list');
-      list.innerHTML = '';
+  } catch (err) {
+    showResult('❌ ' + esc(err.message), 'err');
+  }
+}
 
-      function addItem(badge, cls, name, addr) {
-        const div = document.createElement('div');
-        div.className = 'order-item';
-        div.innerHTML =
-          '<div class="order-num ' + cls + '">' + badge + '</div>' +
-          '<div><div class="order-name">' + name + '</div>' +
-          '<div class="order-addr">' + (addr || '') + '</div></div>';
-        list.appendChild(div);
-      }
+/* ============================================================================
+   ⚙️ 6. 출발지
+   ============================================================================ */
+$('btnGps').addEventListener('click', function () {
 
-      addItem('★', 'start', '🚩 출발: ' + (res.start.name || '현재위치'), '');
+  if (!navigator.geolocation) { alert('이 브라우저는 위치 기능을 지원하지 않습니다.'); return; }
 
-      res.order.forEach(function(v, i) {
-        addItem(String(i + 1), '', v.name, v.address);
+  $('startMeta').textContent = '⏳ 위치 확인 중…';
+
+  navigator.geolocation.getCurrentPosition(function (pos) {
+
+    START = {
+      name: $('startName').value.trim() || '현재위치',
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      manual: false
+    };
+    $('startName').value = START.name;
+    $('startMeta').textContent = '✅ 현재위치: '
+      + START.lat.toFixed(6) + ', ' + START.lng.toFixed(6);
+
+  }, function (err) {
+    $('startMeta').textContent =
+      '⚠️ 위치 권한 실패 (' + err.message + ') → 기본값 서울시청으로 진행합니다.';
+    START = { name: START.name || '현재위치', lat: 37.566826, lng: 126.9786567, manual: false };
+  }, { enableHighAccuracy: true, timeout: 10000 });
+});
+
+$('btnStartManual').addEventListener('click', function () {
+  const el = $('startAddr');
+  const showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if (!showing) el.focus();
+});
+
+$('startName').addEventListener('input', function () {
+  START.name = $('startName').value.trim() || '현재위치';
+});
+
+/* ============================================================================
+   ⚙️ 7. 거래처 목록 로드
+   ============================================================================ */
+async function loadClients() {
+  try {
+    const res = await callApi({ action: 'getclients' }, 90000);
+    if (res.ok && res.clients) {
+      CLIENTS = res.clients;
+      renderClientDatalist();
+    }
+  } catch (err) {
+    console.warn('거래처 목록 로드 실패:', err.message);
+  }
+}
+
+function renderClientDatalist() {
+  let dl = $('clientList');
+  if (!dl) {
+    dl = document.createElement('datalist');
+    dl.id = 'clientList';
+    document.body.appendChild(dl);
+  }
+  dl.innerHTML = CLIENTS.map(function (c) {
+    return '<option value="' + esc(c.name) + '"></option>';
+  }).join('');
+}
+
+$('btnTest').addEventListener('click', async function () {
+
+  showResult('⏳ 연결 진단 중…', 'info');
+
+  try {
+    const res = await callApi({ action: 'selftest' }, 90000);
+
+    if (res.ok) {
+      showResult(
+        '✅ 연결 성공<br>'
+        + '· DB 제목: ' + esc(res.databaseTitle) + '<br>'
+        + '· 실제 속성: ' + esc((res.propertyNames || []).join(', ')) + '<br>'
+        + '· 주소 속성 인식: ' + esc((res.addressPropsMatched || []).join(' / ') || '❌ 없음') + '<br>'
+        + '· 샘플 거래처: ' + esc((res.sampleClients || []).join(' | ')) + '<br>'
+        + '· TMAP_APPKEY 등록: ' + (res.tmapKeySet ? '✅' : '❌')
+        + ' / NOTION_TOKEN 등록: ' + (res.notionKeySet ? '✅' : '❌'),
+        'ok'
+      );
+      await loadClients();
+    } else {
+      showResult('❌ ' + esc(res.error) + (res.url ? '<br>시도 URL: ' + esc(res.url) : ''), 'err');
+    }
+  } catch (err) {
+    showResult('❌ ' + esc(err.message), 'err');
+  }
+});
+
+/* ============================================================================
+   ⚙️ 8. 경로 최적화 실행
+   ============================================================================ */
+function buildStops() {
+
+  const filled = ROWS.filter(function (r) {
+    return (r.name || '').trim() || (r.address || '').trim();
+  });
+
+  if (filled.length < 2) {
+    throw new Error('최소 2곳(경유지 1 + 목적지 1)을 입력하세요.');
+  }
+
+  const goal = filled.find(function (r) { return r.isGoal; }) || filled[filled.length - 1];
+  const rest = filled.filter(function (r) { return r !== goal; });
+
+  // ⭐ GAS 규칙: 마지막 원소 = 목적지(고정 종점)
+  return rest.concat([goal]).map(function (r) {
+    return { name: (r.name || '').trim() || '이름없음', address: (r.address || '').trim() };
+  });
+}
+
+$('btnRun').addEventListener('click', async function () {
+
+  let stops;
+  try { stops = buildStops(); }
+  catch (err) { showResult('❌ ' + esc(err.message), 'err'); return; }
+
+  $('btnRun').disabled = true;
+
+  try {
+    // ① 좌표 일괄 확인 (실패 지점을 먼저 잡아낸다)
+    showResult('⏳ 1/2 좌표 확인 중…', 'info');
+    const geoRes = await callApi({ action: 'geocode', stops: stops });
+
+    (geoRes.results || []).forEach(function (g, i) {
+      const target = ROWS.find(function (r) {
+        return ((r.name || '').trim() || '이름없음') === stops[i].name
+            && (r.address || '').trim() === stops[i].address;
       });
-
-      addItem('🏁', 'goal', '목적지: ' + res.goal.name, res.goal.address);
-
-      const km = (res.totalDistanceM / 1000).toFixed(1);
-      const min = Math.round(res.totalTimeSec / 60);
-
-      document.getElementById('summary').textContent =
-        '📏 총 ' + km + ' km · ⏱️ 약 ' + min + '분 (교통반영)';
-
-    }
-
-    // ────────────── 지도 그리기 (티맵 JS SDK) ──────────────
-    function drawMap(res) {
-
-      document.getElementById('map').style.display = 'block';
-
-      clearOverlays();
-
-      if (!map) {
-        map = new Tmapv2.Map('map', {
-          center: new Tmapv2.LatLng(res.start.lat, res.start.lng),
-          width: '100%',
-          height: '340px',
-          zoom: 11
-        });
-      }
-
-      // 출발지
-      markers.push(new Tmapv2.Marker({
-        position: new Tmapv2.LatLng(res.start.lat, res.start.lng),
-        map: map,
-        label: '🚩',
-        title: '출발'
-      }));
-
-      // 경유지 (최적화 순서)
-      res.order.forEach(function(v, i) {
-        markers.push(new Tmapv2.Marker({
-          position: new Tmapv2.LatLng(v.lat, v.lng),
-          map: map,
-          label: String(i + 1),
-          title: v.name
-        }));
-      });
-
-      // 목적지
-      markers.push(new Tmapv2.Marker({
-        position: new Tmapv2.LatLng(res.goal.lat, res.goal.lng),
-        map: map,
-        label: '🏁',
-        title: res.goal.name
-      }));
-
-      // 경로 선
-      (res.points || []).forEach(function(c, i) {
-        if (i === res.points.length - 1) return;
-        polylines.push(new Tmapv2.Polyline({
-          path: [
-            new Tmapv2.LatLng(c[0], c[1]),
-            new Tmapv2.LatLng(res.points[i + 1][0], res.points[i + 1][1])
-          ],
-          strokeColor: '#c9a227',
-          strokeWeight: 6,
-          map: map
-        }));
-      });
-
-      // 영역 맞춤
-      const all = [[res.start.lat, res.start.lng]]
-        .concat(res.order.map(function(v) { return [v.lat, v.lng]; }))
-        .concat([[res.goal.lat, res.goal.lng]]);
-
-      const lats = all.map(function(a) { return a[0]; });
-      const lngs = all.map(function(a) { return a[1]; });
-
-      map.setCenter(new Tmapv2.LatLng(
-        (Math.min.apply(null, lats) + Math.max.apply(null, lats)) / 2,
-        (Math.min.apply(null, lngs) + Math.max.apply(null, lngs)) / 2
-      ));
-
-    }
-
-    function clearOverlays() {
-      markers.forEach(function(m) { m.setMap(null); });
-      polylines.forEach(function(p) { p.setMap(null); });
-      markers = [];
-      polylines = [];
-    }
-
-    // ────────────── 티맵 앱 연동 (최적화 순서) ──────────────
-    function buildDeeplink(res) {
-
-      const params = [];
-
-      params.push('rStName=' + encodeURIComponent('현재위치'));
-      params.push('rStX=' + res.start.lng);
-      params.push('rStY=' + res.start.lat);
-
-      res.order.forEach(function(v, i) {
-        params.push('rV' + (i + 1) + 'Name=' + encodeURIComponent(v.name));
-        params.push('rV' + (i + 1) + 'X=' + v.lng);
-        params.push('rV' + (i + 1) + 'Y=' + v.lat);
-      });
-
-      params.push('rGoName=' + encodeURIComponent(res.goal.name));
-      params.push('rGoX=' + res.goal.lng);
-      params.push('rGoY=' + res.goal.lat);
-
-      const url = 'tmap://route?' + params.join('&');
-
-      const area = document.getElementById('deeplink');
-      area.style.display = 'block';
-      area.innerHTML = url + '<br><a href="' + url + '">➡️ 직접 열기</a> · ' +
-        'URL을 복사해 티맵 검색창에 붙여넣어도 경로가 열립니다';
-
-      const btn = document.getElementById('btn-tmap');
-      btn.style.display = 'block';
-      btn.onclick = function() { launchTmap(url); };
-
-    }
-
-    function launchTmap(url) {
-
-      const isAndroid = /android/i.test(navigator.userAgent);
-
-      if (isAndroid) {
-        window.location.href =
-          'intent://' + url.replace('tmap://', '') +
-          '#Intent;scheme=tmap;package=com.skt.tmap.ku;' +
-          'S.browser_fallback_url=' +
-          encodeURIComponent(STORE_ANDROID_HTTP) + ';end';
-        return;
-      }
-
-      window.location.href = url;
-      setTimeout(function() {
-        if (document.visibilityState === 'visible') {
-          window.location.href = STORE_IOS;
-        }
-      }, 2500);
-
-    }
-
-    // ────────────── 초기화 버튼 ──────────────
-    document.getElementById('btn-reset').addEventListener('click', function() {
-      buildRows();
-      clearOverlays();
-      document.getElementById('result-card').style.display = 'none';
-      document.getElementById('deeplink').style.display = 'none';
-      document.getElementById('btn-tmap').style.display = 'none';
-      setStatus('거래처를 선택하거나 주소를 직접 입력하세요.');
+      if (target) target.geo = g;
     });
+    renderRows();
 
-    // ────────────── 시작 ──────────────
-    buildRows();
-    loadClients();
+    const failed = (geoRes.results || []).filter(function (g) { return !g.ok; });
 
-  </script>
+    if (failed.length) {
+      showResult(
+        '❌ 좌표 변환 실패 ' + failed.length + '건<br>'
+        + failed.map(function (f) {
+            return '· <b>' + esc(f.name) + '</b>: ' + esc(f.reason);
+          }).join('<br>')
+        + '<hr>→ 해당 행의 <b>✏️ 주소수정</b> 후 <b>📍주소확인</b>, '
+        + '또는 <b>🔍원인진단</b>으로 TMAP 원본 응답을 확인하세요.',
+        'err'
+      );
+      return;
+    }
 
+    // ② 경유지 순서 최적화
+    showResult('⏳ 2/2 경유지 순서 최적화 중…', 'info');
+
+    const res = await callApi({
+      action: 'optimroute',
+      start: START,
+      stops: stops
+    }, 120000);
+
+    if (!res.ok) {
+      showResult('❌ ' + esc(res.error), 'err');
+      return;
+    }
+
+    RESULT = res;
+    drawMap(res);
+    renderOrder(res);
+
+    $('btnTmap').disabled = false;
+    $('btnTmapGoal').disabled = false;
+
+  } catch (err) {
+    showResult('❌ ' + esc(err.message), 'err');
+  } finally {
+    $('btnRun').disabled = false;
+  }
+});
+
+/* ============================================================================
+   ⚙️ 9. 지도 / 결과 출력
+   ============================================================================ */
+function drawMap(res) {
+
+  $('map').style.display = 'block';
+
+  if (!map) {
+    map = L.map('map').setView([res.start.lat, res.start.lng], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+  }
+
+  if (mapLayer) { map.removeLayer(mapLayer); }
+  mapLayer = L.layerGroup().addTo(map);
+
+  // 경로선
+  if (res.points && res.points.length) {
+    L.polyline(res.points, { color: '#2563eb', weight: 5, opacity: .8 }).addTo(mapLayer);
+  }
+
+  const bounds = [];
+
+  // 출발
+  L.marker([res.start.lat, res.start.lng])
+    .addTo(mapLayer).bindPopup('<b>출발</b><br>' + esc(res.start.name));
+  bounds.push([res.start.lat, res.start.lng]);
+
+  // 최적화된 경유지
+  (res.order || []).forEach(function (v, i) {
+    L.marker([v.lat, v.lng]).addTo(mapLayer)
+      .bindPopup('<b>' + (i + 1) + '번 경유</b><br>' + esc(v.name)
+        + (v.address ? '<br>' + esc(v.address) : ''));
+    bounds.push([v.lat, v.lng]);
+  });
+
+  // 목적지
+  L.marker([res.goal.lat, res.goal.lng]).addTo(mapLayer)
+    .bindPopup('<b>★ 목적지</b><br>' + esc(res.goal.name));
+  bounds.push([res.goal.lat, res.goal.lng]);
+
+  if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
+  setTimeout(function () { map.invalidateSize(); }, 120);
+}
+
+function renderOrder(res) {
+
+  const km = (res.totalDistanceM || 0) / 1000;
+  const min = Math.round((res.totalTimeSec || 0) / 60);
+
+  let html = '<b>✅ 최적화 완료</b><br>'
+    + '· 총 거리: <b>' + km.toFixed(1) + ' km</b> · 예상 시간: <b>'
+    + Math.floor(min / 60) + '시간 ' + (min % 60) + '분</b><br>'
+    + '<ul class="olist">'
+    + '<li><span class="pin" style="background:#2563eb">출</span>'
+      + esc(res.start.name) + '</li>';
+
+  (res.order || []).forEach(function (v, i) {
+    html += '<li><span class="pin">' + (i + 1) + '</span>' + esc(v.name)
+      + (v.address ? '<span class="meta" style="margin-left:auto">'
+          + esc(v.address) + '</span>' : '') + '</li>';
+  });
+
+  html += '<li><span class="pin" style="background:#dc2626">★</span>'
+    + esc(res.goal.name) + ' <span class="meta" style="margin-left:auto">목적지</span></li>'
+    + '</ul>';
+
+  showResult(html, 'ok');
+}
+
+/* ============================================================================
+   ⚙️ 10. 티맵 앱 딥링크
+   ============================================================================ */
+function buildTmapUrl(includeVias) {
+
+  if (!RESULT) return '';
+
+  let url = 'tmap://route'
+    + '?goalname=' + encodeURIComponent(RESULT.goal.name)
+    + '&goalx=' + RESULT.goal.lng
+    + '&goaly=' + RESULT.goal.lat;
+
+  // 경유지 (rV1Name / rV1X / rV1Y 규약 — 기기에서 동작 확인 필요)
+  if (includeVias) {
+    (RESULT.order || []).forEach(function (v, i) {
+      const n = i + 1;
+      url += '&rV' + n + 'Name=' + encodeURIComponent(v.name)
+           + '&rV' + n + 'X=' + v.lng
+           + '&rV' + n + 'Y=' + v.lat;
+    });
+  }
+  return url;
+}
+
+$('btnTmap').addEventListener('click', function () {
+  const url = buildTmapUrl(true);
+  if (url) window.location.href = url;
+});
+
+$('btnTmapGoal').addEventListener('click', function () {
+  const url = buildTmapUrl(false);
+  if (url) window.location.href = url;
+});
+
+/* ============================================================================
+   ⚙️ 11. 기타 버튼 / 초기화
+   ============================================================================ */
+$('btnAdd').addEventListener('click', function () { addRow(); });
+
+$('btnClear').addEventListener('click', function () {
+  ROWS = []; RESULT = null;
+  $('btnTmap').disabled = true;
+  $('btnTmapGoal').disabled = true;
+  $('map').style.display = 'none';
+  $('resultCard').style.display = 'none';
+  addRow();
+});
+
+// 초기 행 3개 생성 (최소 사용 흐름)
+addRow();
+addRow();
+addRow();
+
+// 거래처 목록 자동 로드 + 연결 자가진단
+(async function init() {
+  await loadClients();
+})();
+
+// 서비스 워커 (선택 — 없으면 무시됨)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js').catch(function () {});
+}
+</script>
 </body>
-
 </html>
