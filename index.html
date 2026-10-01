@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#05070b">
-<title>푸로찜에스 티맵 경로 도우미 v4.0</title>
+<title>푸로찜에스 티맵 경로 도우미 v4.1</title>
 <link rel="manifest" href="./manifest.json">
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=여기에_JAVASCRIPT_키_입력&libraries=services"></script>
+<!-- ⭐ v4.1: 카카오 지도 SDK는 페이지 열 때가 아니라 필요할 때 동적으로 로드합니다
+     (실패 시 원인까지 알려주는 로더는 아래 script 안 loadKakaoSDK 참고) -->
 <style>
   :root{
     --bg:#05070b; --line:rgba(255,255,255,.18); --txt:#f8fafc;
@@ -108,6 +109,11 @@
     cursor:pointer;
   }
   .chip .x{color:#fca5a5;font-weight:700;padding-left:2px}
+  .chip .chip-go{cursor:pointer}
+  .chip .chip-start{
+    cursor:pointer;background:rgba(234,88,12,.35);border-radius:999px;
+    padding:0 4px;margin-left:2px;
+  }
   details{margin-top:8px}
   details summary{cursor:pointer;font-size:12px;color:#93c5fd;font-weight:600}
   pre{
@@ -167,7 +173,7 @@
 <header>
   <div class="hrow">
     <div>
-      <h1>🚗 푸로찜에스 티맵 경로 도우미 <span style="color:#60a5fa">v4.0 카카오</span></h1>
+      <h1>🚗 푸로찜에스 티맵 경로 도우미 <span style="color:#60a5fa">v4.1 카카오</span></h1>
       <p>카카오 실시간 경로 확인 → 주소 복사 → 티맵 최종 주행</p>
     </div>
     <button class="btn ghost small" id="btnTest">🔗 연결테스트</button>
@@ -183,8 +189,9 @@
       <div class="toolbar">
         <button class="btn small" id="btnGps">📍 현재 위치로 출발</button>
         <button class="btn ghost small" id="btnStartHome">🏠 집(계동)에서 출발</button>
+        <button class="btn ghost small" id="btnStartCompany">🏢 회사에서 출발</button>
       </div>
-      <div class="meta" id="startMeta">GPS 미사용 시 기본값: 서울시 종로구 계동 2길 15</div>
+      <div class="meta" id="startMeta">앱을 열면 자동으로 현재 위치로 출발합니다. 실패 시 집(계동) 기본값.</div>
     </div>
   </div>
 
@@ -192,18 +199,19 @@
     <h2>📍 배송지 입력 (최대 6곳 · ★ = 최종 목적지)</h2>
     <div class="chips" id="presetChips"></div>
     <div class="toolbar" id="presetAddBar" style="display:none">
-      <input type="text" id="presetName" placeholder="프리셋 이름 (예: 창고)" style="max-width:110px">
+      <input type="text" id="presetName" placeholder="즐겨찾기 이름 (예: 창고)" style="max-width:110px">
       <input type="text" id="presetAddr" placeholder="주소" style="flex:1;min-width:140px">
       <button class="btn small" id="btnPresetSave">저장</button>
       <button class="btn ghost small" id="btnPresetCancel">취소</button>
     </div>
     <div id="rows"></div>
     <div class="toolbar">
-      <button class="btn small" id="btnAddPreset">＋ 프리셋 추가</button>
+      <button class="btn small" id="btnAddPreset">＋ 즐겨찾기 추가</button>
       <button class="btn small" id="btnAdd">＋ 배송지 추가</button>
       <button class="btn ghost small" id="btnClear">전체 지우기</button>
     </div>
-    <div class="hint">
+      <div class="hint">
+      즐겨찾기 칩의 <b>🚩</b>를 누르면 그 곳이 출발지로 설정됩니다.<br>
       거래처명 입력 시 노션 주소가 자동 채워지고, <b>입력 즉시 좌표가 자동 확인</b>됩니다.<br>
       <b>📋</b> 버튼으로 주소를 복사 → 티맵 앱에 붙여넣어 경유지를 추가하세요.<br>
       <b>▲▼</b> 순서변경 · <b>★</b> 목적지 지정 · <b>✕</b> 삭제
@@ -216,10 +224,11 @@
       <button class="btn" id="btnRun" style="flex:1">🚀 경로 최적화 후 지도표시</button>
     </div>
     <div class="toolbar" style="margin-top:8px">
-      <button class="btn tmap" id="btnTmap" disabled style="flex:1">📱 티맵 앱으로 열기 (목적지)</button>
+      <button class="btn tmap" id="btnTmap" style="flex:1">📱 티맵 앱으로 열기 (목적지)</button>
       <button class="btn ghost small" id="btnCopyOrder" disabled>📋 순서 목록 복사</button>
     </div>
     <div class="legend meta">
+      · 목적지만 입력한 뒤 <b>📱 티맵 앱으로 열기</b>를 누르면 최적화 없이 바로 티맵이 열립니다.<br>
       · 카카오 실시간 교통 정보로 총 시간/거리를 먼저 확인합니다.<br>
       · 티맵 딥링크는 공식적으로 경유지를 지원하지 않아 <b>목적지 1곳만</b> 전달됩니다.<br>
       · 각 배송지의 📋 복사 버튼으로 주소를 복사 → 티맵에서 붙여넣어 경유지를 순서대로 추가하세요.
@@ -246,12 +255,13 @@ const GAS_URL =
 const KAKAO_JS_KEY = 'cd143a1f0fdb6106f499b67535d11b2f';
 const MAX_ROWS = 6;
 
-// 기본 출발지 = 집 (GPS 미사용 시)
-const HOME = { name: '집', address: '서울시 종로구 계동 2길 15', lat: 37.5821, lng: 126.9840 };
+// 기본 출발지 후보: 집 / 회사 (GPS 실패 시 집)
+const HOME    = { name: '집',   address: '서울시 종로구 계동 2길 15',    lat: 37.5821, lng: 126.9840 };
+const COMPANY = { name: '회사', address: '서울시 서대문구 창천동 97-125', lat: 37.5629, lng: 126.9373 };
 
 let CLIENTS  = [];
 let ROWS     = [];
-let START    = { name: HOME.name, lat: HOME.lat, lng: HOME.lng, manual: false };
+let START    = { name: '현재위치', lat: HOME.lat, lng: HOME.lng, manual: false };
 let RESULT   = null;
 let map      = null;
 let mapLayer = null;
@@ -388,7 +398,8 @@ function normalizeName(t) {
 }
 
 /* ============================================================================
-   ⚙️ 4. 자주 가는 곳 프리셋 (집/회사/학교 기본 + localStorage 추가)
+   ⚙️ 4. 자주 가는 곳 즐겨찾기 (집/회사/학교 기본 + localStorage 추가)
+        · 배송지로도 쓰고, 🚩 클릭 시 출발지로도 사용
    ============================================================================ */
 const PRESETS_KEY = 'TMAP_ROUTE_PRESETS_V1';
 
@@ -416,8 +427,9 @@ function renderPresets() {
   const box = $('presetChips');
   box.innerHTML = all.map(function (p, i) {
     const isCustom = i >= customStart;
-    return '<span class="chip" data-i="' + i + '" title="' + esc(p.address) + '">'
-      + esc(p.label || p.name)
+    return '<span class="chip" data-i="' + i + '">'
+      + '<span class="chip-go" data-go="' + i + '" title="배송지로 추가">' + esc(p.label || p.name) + '</span>'
+      + '<span class="chip-start" data-start="' + i + '" title="출발지로 설정">🚩</span>'
       + (isCustom ? ' <span class="x" data-x="' + i + '">✕</span>' : '')
       + '</span>';
   }).join('');
@@ -438,6 +450,7 @@ function applyPreset(idx) {
   row.name = p.name || p.label || '';
   row.address = p.address || '';
   row.geo = null;
+  invalidateResult_();
 
   const nameEl = document.querySelector('input[data-id="' + row.id + '"][data-k="name"]');
   const addrEl = document.querySelector('input[data-id="' + row.id + '"][data-k="address"]');
@@ -458,8 +471,11 @@ $('presetChips').addEventListener('click', function (ev) {
     renderPresets();
     return;
   }
-  const chip = ev.target.closest ? ev.target.closest('.chip') : null;
-  if (chip) applyPreset(Number(chip.dataset.i));
+  // ⭐ 🚩 = 출발지로 설정 / 그 외 영역 클릭 = 배송지로 추가
+  const st = ev.target.closest ? ev.target.closest('.chip-start') : null;
+  if (st) { applyPresetAsStart(Number(st.dataset.start)); return; }
+  const go = ev.target.closest ? ev.target.closest('.chip-go') : null;
+  if (go) { applyPreset(Number(go.dataset.go)); return; }
 });
 
 $('btnAddPreset').addEventListener('click', function () {
@@ -485,7 +501,7 @@ $('btnPresetSave').addEventListener('click', function () {
   saveCustomPresets(custom);
   renderPresets();
   $('btnPresetCancel').click();
-  showToast('프리셋이 저장되었습니다.');
+  showToast('즐겨찾기가 저장되었습니다.');
 });
 
 /* ============================================================================
@@ -687,6 +703,35 @@ function moveRow(id, dir) {
   renderRows();
 }
 
+/* ── 즐겨찾기(프리셋)를 출발지로 사용 — 카카오 로컬 REST API로 좌표 확인 ── */
+function applyPresetAsStart(idx) {
+
+  const p = loadPresets()[idx];
+  if (!p) return;
+
+  const label = '🚩 ' + (p.name || p.label || '즐겨찾기') + ' 출발';
+  $('startName').value = p.name || p.label || '출발지';
+  $('startMeta').textContent = label + ' — 좌표 자동 확인 중…';
+
+  callApi({ action: 'geocode', stops: [{ name: p.name || '', address: p.address }] }, 60000)
+    .then(function (res) {
+      const g = (res.results || [])[0];
+      if (g && g.ok) {
+        START = {
+          name: $('startName').value.trim() || '출발지',
+          lat: g.lat, lng: g.lng, manual: true
+        };
+        $('startMeta').textContent = label + ': ' + g.lat.toFixed(6) + ', ' + g.lng.toFixed(6);
+        showToast('출발지로 설정했습니다.');
+      } else {
+        $('startMeta').textContent = label + ' 실패 — 주소를 확인하세요.';
+      }
+    })
+    .catch(function () {
+      $('startMeta').textContent = label + ' 실패 — 연결을 확인하세요.';
+    });
+}
+
 function statusBadgeHtml(r) {
   if (!r.geo) return '<span class="badge b-wait">미확인</span>';
   if (!r.geo.ok) return '<span class="badge b-err">좌표 실패</span>';
@@ -751,6 +796,8 @@ function renderRows() {
     const inp = document.querySelector('input[data-id="' + r.id + '"][data-k="name"]');
     if (inp) attachAutocomplete(inp);
   });
+
+  updateTmapBtn();
 }
 
 // 상태 배지만 부분 갱신 (재렌더 없이 → 포커스 유지)
@@ -852,6 +899,7 @@ $('rows').addEventListener('input', function (ev) {
   }
 
   // ⭐ 입력 즉시 자동 좌표확인 (원인진단 버튼 불필요)
+  invalidateResult_();
   autoCheckRow(row.id);
 });
 
@@ -863,10 +911,10 @@ $('rows').addEventListener('click', function (ev) {
   const id  = btn.dataset.id;
   const act = btn.dataset.a;
 
-  if (act === 'del')  { removeRow(id); return; }
-  if (act === 'goal') { setGoal(id);   return; }
-  if (act === 'up')   { moveRow(id, -1); return; }
-  if (act === 'down') { moveRow(id,  1); return; }
+  if (act === 'del')  { removeRow(id); invalidateResult_(); return; }
+  if (act === 'goal') { setGoal(id);   invalidateResult_(); return; }
+  if (act === 'up')   { moveRow(id, -1); invalidateResult_(); return; }
+  if (act === 'down') { moveRow(id,  1); invalidateResult_(); return; }
 
   if (act === 'copy') {
     const row = ROWS.find(function (r) { return r.id === id; });
@@ -882,16 +930,26 @@ $('rows').addEventListener('click', function (ev) {
 /* ============================================================================
    ⚙️ 8. 출발지
    ============================================================================ */
-$('btnGps').addEventListener('click', function () {
+/* ── 현재 위치로 출발 (auto=true: 앱 열 때 자동 실행, 실패해도 알림 없이 조용히 대체) ── */
+function autoStartGps(auto) {
 
-  if (!navigator.geolocation) { alert('이 브라우저는 위치 기능을 지원하지 않습니다.'); return; }
+  if (!navigator.geolocation) {
+    if (auto) {
+      START = { name: HOME.name, lat: HOME.lat, lng: HOME.lng, manual: false };
+      $('startName').value = HOME.name;
+      $('startMeta').textContent = '⚠️ 위치 기능 미지원 → 기본값 집(계동)으로 출발합니다.';
+    } else {
+      alert('이 브라우저는 위치 기능을 지원하지 않습니다.');
+    }
+    return;
+  }
 
-  $('startMeta').textContent = '⏳ 위치 확인 중…';
+  if (!auto) $('startMeta').textContent = '⏳ 위치 확인 중…';
 
   navigator.geolocation.getCurrentPosition(function (pos) {
 
     START = {
-      name: $('startName').value.trim() || '현재위치',
+      name: auto ? '현재위치' : ($('startName').value.trim() || '현재위치'),
       lat: pos.coords.latitude,
       lng: pos.coords.longitude,
       manual: false
@@ -901,10 +959,34 @@ $('btnGps').addEventListener('click', function () {
       + START.lat.toFixed(6) + ', ' + START.lng.toFixed(6);
 
   }, function (err) {
+    START = { name: HOME.name, lat: HOME.lat, lng: HOME.lng, manual: false };
+    $('startName').value = HOME.name;
     $('startMeta').textContent =
-      '⚠️ 위치 권한 실패 (' + err.message + ') → 기본값 집(계동)으로 진행합니다.';
-    START = { name: '집', lat: HOME.lat, lng: HOME.lng, manual: false };
+      '⚠️ 위치 권한 실패 (' + err.message + ') → 기본값 집(계동)으로 출발합니다.';
   }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+$('btnGps').addEventListener('click', function () { autoStartGps(false); });
+
+/* ── 회사에서 출발 (카카오 로컬 REST API로 좌표 자동 확인) ── */
+$('btnStartCompany').addEventListener('click', function () {
+  START = { name: COMPANY.name, lat: COMPANY.lat, lng: COMPANY.lng, manual: true };
+  $('startName').value = COMPANY.name;
+  $('startMeta').textContent = '🏢 회사 출발 — 좌표 자동 확인 중…';
+
+  callApi({ action: 'geocode', stops: [{ name: COMPANY.name, address: COMPANY.address }] }, 60000)
+    .then(function (res) {
+      const g = (res.results || [])[0];
+      if (g && g.ok) {
+        START.lat = g.lat; START.lng = g.lng;
+        $('startMeta').textContent = '🏢 회사 출발: ' + g.lat.toFixed(6) + ', ' + g.lng.toFixed(6);
+      } else {
+        $('startMeta').textContent = '🏢 회사 출발 (기본 좌표 사용)';
+      }
+    })
+    .catch(function () {
+      $('startMeta').textContent = '🏢 회사 출발 (기본 좌표 사용)';
+    });
 });
 
 $('btnStartHome').addEventListener('click', function () {
@@ -1057,15 +1139,15 @@ $('btnRun').addEventListener('click', async function () {
     RESULT = res;
     syncResultGeoToRows(res);
 
-    $('btnTmap').disabled      = false;
     $('btnCopyOrder').disabled = false;
+    updateTmapBtn();
 
     document.body.classList.add('result-mode');   // ⭐ bg2.png 모드
 
     let mapNote = '';
 
     try {
-      drawMap(res);
+      await drawMap(res);
     } catch (mapErr) {
       $('map').style.display = 'none';
       mapNote = '<div class="meta" style="margin-top:6px">⚠️ 지도 표시 실패: '
@@ -1104,6 +1186,70 @@ function syncResultGeoToRows(res) {
 /* ============================================================================
    ⚙️ 11. 카카오 지도 / 결과 출력
    ============================================================================ */
+/* ── ⭐ 카카오 지도 SDK 동적 로더 (autoload=false + kakao.maps.load) ──
+   페이지 열 때 미리 로드하지 않으므로, 키/도메인 문제가 있어도
+   앱의 나머지 기능(시간/거리/복사/티맵)은 전혀 막히지 않습니다.
+   로드 실패 시 원인 4가지를 구체적으로 알려줍니다. */
+let SDK_STATE   = 'idle';   // idle | loading | ready | error
+let SDK_WAITERS = [];
+
+function sdkFailError_() {
+  return new Error(
+    '지도 로드 실패 — 아래 4가지를 순서대로 확인하세요.\n'
+    + '① 사용한 키가 "JavaScript 키"인지 (REST API 키는 지도에 못 씀)\n'
+    + '② 카카오 개발자콘솔 [앱] > [플랫폼 키] > [JavaScript 키] > [JavaScript SDK 도메인]에'
+    + ' 접속 주소(예: https://아이디.github.io)가 등록되어 있는지\n'
+    + '③ 등록한 도메인과 실제 열어본 주소가 같은지 (https:// 포함)\n'
+    + '④ 애드블록·차단 앱이 dapi.kakao.com을 막지 않는지'
+  );
+}
+
+function loadKakaoSDK() {
+  return new Promise(function (resolve, reject) {
+
+    if (typeof kakao !== 'undefined' && kakao.maps && kakao.maps.LatLng) {
+      SDK_STATE = 'ready';
+      resolve();
+      return;
+    }
+    if (SDK_STATE === 'error') { reject(sdkFailError_()); return; }
+
+    SDK_WAITERS.push({ resolve: resolve, reject: reject });
+    if (SDK_STATE === 'loading') return;
+    SDK_STATE = 'loading';
+
+    const s = document.createElement('script');
+    s.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey='
+      + encodeURIComponent(KAKAO_JS_KEY) + '&autoload=false&libraries=services';
+
+    s.onload = function () {
+      try {
+        kakao.maps.load(function () {
+          SDK_STATE = 'ready';
+          SDK_WAITERS.forEach(function (w) { w.resolve(); });
+          SDK_WAITERS = [];
+        });
+      } catch (e) {
+        SDK_STATE = 'error';
+        SDK_WAITERS.forEach(function (w) { w.reject(sdkFailError_()); });
+        SDK_WAITERS = [];
+      }
+    };
+
+    s.onerror = function () {
+      SDK_STATE = 'error';
+      const err = new Error(
+        '지도 스크립트(dapi.kakao.com)를 불러오지 못했습니다.\n'
+        + '① JavaScript 키가 맞는지 ② JavaScript SDK 도메인에 접속 주소가 등록되어 있는지'
+        + ' ③ 애드블록·차단 앱이 막고 있지 않은지 확인하세요.');
+      SDK_WAITERS.forEach(function (w) { w.reject(err); });
+      SDK_WAITERS = [];
+    };
+
+    document.head.appendChild(s);
+  });
+}
+
 // traffic_state → 색상 (카카오 기준: 1 원활 / 2 서서히 / 3·4 정체·통제 / 0 정보없음)
 function trafficColor(state) {
   if (state === 1) return '#1976d2';   // 원활 - 파랑
@@ -1112,11 +1258,10 @@ function trafficColor(state) {
   return '#2563eb';
 }
 
-function drawMap(res) {
+async function drawMap(res) {
 
-  if (typeof kakao === 'undefined' || !kakao.maps) {
-    throw new Error('카카오 지도 SDK(JS키/도메인 등록)를 확인하세요.');
-  }
+  // ⭐ 필요할 때 SDK를 로드하고, 실패하면 원인까지 담은 에러를 던짐
+  await loadKakaoSDK();
 
   $('map').style.display = 'block';
 
@@ -1224,6 +1369,29 @@ function renderOrder(res, mapNote) {
 /* ============================================================================
    ⚙️ 12. 티맵 앱 딥링크 (공식 지원: 목적지 1곳만) + 순서 목록 복사
    ============================================================================ */
+/* ── 티맵 버튼 활성화: 최적화 결과 없이도 목적지 후보가 있으면 즉시 사용 ── */
+function filledRows() {
+  return ROWS.filter(function (r) {
+    return (r.name || '').trim() || (r.address || '').trim();
+  });
+}
+
+function goalRow() {
+  const filled = filledRows();
+  if (!filled.length) return null;
+  return filled.find(function (r) { return r.isGoal; }) || filled[filled.length - 1];
+}
+
+function updateTmapBtn() {
+  $('btnTmap').disabled = !goalRow();
+}
+
+/* ── 행이 바뀌면 이전 최적화 결과는 폐기 (티맵 버튼은 계속 사용 가능) ── */
+function invalidateResult_() {
+  RESULT = null;
+  $('btnCopyOrder').disabled = true;
+  updateTmapBtn();
+}
 function buildTmapUrl() {
 
   if (!RESULT) return '';
@@ -1235,9 +1403,47 @@ function buildTmapUrl() {
     + '&goaly=' + RESULT.goal.lat;
 }
 
-$('btnTmap').addEventListener('click', function () {
-  const url = buildTmapUrl();
-  if (url) window.location.href = url;
+$('btnTmap').addEventListener('click', async function () {
+
+  // ① 최적화 결과가 있으면 그대로 사용
+  if (RESULT) {
+    const url = buildTmapUrl();
+    if (url) window.location.href = url;
+    return;
+  }
+
+  // ② ⭐ 결과 없이 목적지만 입력한 경우: 좌표만 확인하고 바로 티맵 실행
+  const goal = goalRow();
+  if (!goal) { showToast('목적지를 먼저 입력하세요.'); return; }
+
+  const name = (goal.name || '').trim() || '목적지';
+  const addr = (goal.address || '').trim();
+  if (!addr && !name) { showToast('목적지 주소를 입력하세요.'); return; }
+
+  let lat = (goal.geo && goal.geo.ok) ? goal.geo.lat : 0;
+  let lng = (goal.geo && goal.geo.ok) ? goal.geo.lng : 0;
+
+  if (!lat || !lng) {
+    showToast('⏳ 목적지 좌표 확인 중…');
+    try {
+      const res = await callApi({ action: 'geocode', stops: [{ name: name, address: addr }] }, 60000);
+      const g = (res.results || [])[0];
+      if (g && g.ok) {
+        goal.geo = g;
+        if (g.matched) goal.matchedAddress = g.matched;
+        updateRowStatus(goal.id);
+        lat = g.lat; lng = g.lng;
+      }
+    } catch (err) { /* 아래에서 안내 */ }
+  }
+
+  if (!lat || !lng) { showToast('❌ 목적지 좌표 확인 실패 — 주소를 확인하세요.'); return; }
+
+  // ⭐ 티맵 URL Scheme: goalx=경도(lng), goaly=위도(lat) — 목적지만 전달 가능
+  window.location.href = 'tmap://route'
+    + '?goalname=' + encodeURIComponent(name)
+    + '&goalx=' + lng
+    + '&goaly=' + lat;
 });
 
 $('btnCopyOrder').addEventListener('click', async function () {
@@ -1268,8 +1474,8 @@ $('btnAdd').addEventListener('click', function () { addRow(); });
 
 $('btnClear').addEventListener('click', function () {
   ROWS = []; RESULT = null;
-  $('btnTmap').disabled = true;
   $('btnCopyOrder').disabled = true;
+  updateTmapBtn();
   $('map').style.display = 'none';
   $('resultCard').style.display = 'none';
   document.body.classList.remove('result-mode');
@@ -1281,9 +1487,11 @@ addRow();
 addRow();
 
 (async function init() {
-  // ⭐ 기본 출발지(집) 좌표를 카카오로 자동 확정
   await loadClients();
-  $('btnStartHome').click();
+  // ⭐ 앱을 열면 버튼을 누를 필요 없이 자동으로 현재 위치를 출발지로 설정
+  //    (위치 권한 실패 시 자동으로 집(계동) 기본값)
+  autoStartGps(true);
+  updateTmapBtn();
 })();
 
 if ('serviceWorker' in navigator) {
