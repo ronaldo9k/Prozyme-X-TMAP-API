@@ -92,6 +92,66 @@
   .b-wait{background:rgba(255,255,255,.15);color:#cbd5e1}
   .meta{font-size:11px;color:var(--muted);word-break:break-all;line-height:1.5}
   #map{height:360px;border-radius:14px;display:none;margin-bottom:14px;background:#1e293b}
+
+  /* ⭐ v4.1 유지 + 수정:
+     카카오 InfoWindow는 흰색 배경 위에 body의 color를 상속받을 수 있습니다.
+     현재 body 글자색은 밝은색(--txt)이므로 지도 안내 박스 글씨가 흰색으로 보일 수 있습니다.
+     지도 안내 박스 전용 색상을 명시적으로 고정합니다. */
+  .kakao-route-iw,
+  .kakao-route-iw *{
+    color:#0f172a !important;
+  }
+  .kakao-route-iw{
+    background:#fff !important;
+    padding:7px 10px;
+    font-size:12px;
+    line-height:1.45;
+    white-space:nowrap;
+    border-radius:4px;
+    box-sizing:border-box;
+  }
+  .kakao-route-iw b{
+    color:#0f172a !important;
+  }
+
+  /* ⭐ 모바일 배송지 행:
+     거래처명/주소를 넓게 쓰고
+     ① ▲▼  ② ★/📋  ③ ✕ 순서로 3줄 배치 */
+  @media (max-width: 600px){
+    .row{
+      grid-template-columns:34px minmax(0,1fr);
+      gap:8px;
+      padding:10px;
+    }
+    .row .f{
+      grid-column:2;
+      grid-row:1;
+      width:100%;
+    }
+    .row .acts{
+      grid-column:2;
+      grid-row:2;
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:6px;
+      width:100%;
+      margin-top:2px;
+    }
+    .row .acts .btn{
+      width:100%;
+      min-width:0;
+      height:32px;
+      font-size:13px;
+    }
+    .row .acts .btn[data-a="del"]{
+      grid-column:1;
+    }
+    .row input[type=text]{
+      font-size:14px;
+      padding:10px 11px;
+    }
+  }
+
   .msg{
     font-size:13px;padding:11px 12px;border-radius:10px;white-space:pre-wrap;
     line-height:1.6;word-break:break-word;
@@ -187,11 +247,15 @@
     <div class="f">
       <input type="text" id="startName" placeholder="출발지 이름 (예: 집 / 현재위치)" value="집">
       <div class="toolbar">
+        <input type="text" id="startAddress" placeholder="출발지 주소 검색 (예: 서울시 강남구 테헤란로 123)" autocomplete="street-address" style="flex:1;min-width:220px">
+        <button class="btn small" id="btnStartAddress">🔎 주소로 출발지 설정</button>
+      </div>
+      <div class="toolbar">
         <button class="btn small" id="btnGps">📍 현재 위치로 출발</button>
         <button class="btn ghost small" id="btnStartHome">🏠 집(계동)에서 출발</button>
         <button class="btn ghost small" id="btnStartCompany">🏢 회사에서 출발</button>
       </div>
-      <div class="meta" id="startMeta">앱을 열면 자동으로 현재 위치로 출발합니다. 실패 시 집(계동) 기본값.</div>
+      <div class="meta" id="startMeta">앱을 열면 자동으로 현재 위치로 출발합니다. 실패 시 집(계동) 기본값. 주소를 직접 검색해 출발지로 설정할 수도 있습니다.</div>
     </div>
   </div>
 
@@ -711,6 +775,7 @@ function applyPresetAsStart(idx) {
 
   const label = '🚩 ' + (p.name || p.label || '즐겨찾기') + ' 출발';
   $('startName').value = p.name || p.label || '출발지';
+  $('startAddress').value = p.address || '';
   $('startMeta').textContent = label + ' — 좌표 자동 확인 중…';
 
   callApi({ action: 'geocode', stops: [{ name: p.name || '', address: p.address }] }, 60000)
@@ -930,6 +995,87 @@ $('rows').addEventListener('click', function (ev) {
 /* ============================================================================
    ⚙️ 8. 출발지
    ============================================================================ */
+
+/* ── ⭐ 주소를 검색해서 출발지로 설정 ──
+   기존 GAS geocode 기능을 그대로 사용합니다.
+   주소가 정확히 확인된 경우에만 START 좌표를 교체하므로
+   기존 현재위치 / 집 / 회사 기능에는 영향을 주지 않습니다. */
+async function setStartByAddress_() {
+
+  const address = ($('startAddress').value || '').trim();
+
+  if (!address) {
+    showToast('출발지 주소를 입력하세요.');
+    $('startAddress').focus();
+    return;
+  }
+
+  const name = ($('startName').value || '').trim() || '출발지';
+
+  $('btnStartAddress').disabled = true;
+  $('startMeta').textContent = '⏳ 출발지 주소 좌표 확인 중…';
+
+  try {
+
+    const res = await callApi({
+      action: 'geocode',
+      stops: [{ name: name, address: address }]
+    }, 60000);
+
+    const g = (res.results || [])[0];
+
+    if (!g || !g.ok) {
+      $('startMeta').textContent =
+        '❌ 출발지 주소를 찾지 못했습니다.'
+        + (g && g.reason ? ' ' + g.reason : '')
+        + ' 주소를 조금 더 정확하게 입력해 주세요.';
+      return;
+    }
+
+    START = {
+      name: name,
+      lat: g.lat,
+      lng: g.lng,
+      manual: true
+    };
+
+    $('startName').value = name;
+
+    /* 카카오가 실제로 매칭한 주소가 있으면 검색창에도 반영 */
+    if (g.matched && g.matched.length > 4) {
+      $('startAddress').value = g.matched;
+    }
+
+    $('startMeta').textContent =
+      '📍 주소 출발: ' + name + ' — '
+      + g.lat.toFixed(6) + ', ' + g.lng.toFixed(6);
+
+    showToast('출발지가 주소로 설정되었습니다.');
+
+  } catch (err) {
+
+    $('startMeta').textContent =
+      '❌ 출발지 주소 검색 실패 — ' + (err.message || '연결을 확인하세요.');
+
+  } finally {
+
+    $('btnStartAddress').disabled = false;
+
+  }
+}
+
+/* 주소 입력창에서 Enter를 눌러도 바로 검색 */
+$('startAddress').addEventListener('keydown', function (ev) {
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    setStartByAddress_();
+  }
+});
+
+$('btnStartAddress').addEventListener('click', function () {
+  setStartByAddress_();
+});
+
 /* ── 현재 위치로 출발 (auto=true: 앱 열 때 자동 실행, 실패해도 알림 없이 조용히 대체) ── */
 function autoStartGps(auto) {
 
@@ -937,6 +1083,7 @@ function autoStartGps(auto) {
     if (auto) {
       START = { name: HOME.name, lat: HOME.lat, lng: HOME.lng, manual: false };
       $('startName').value = HOME.name;
+      $('startAddress').value = HOME.address;
       $('startMeta').textContent = '⚠️ 위치 기능 미지원 → 기본값 집(계동)으로 출발합니다.';
     } else {
       alert('이 브라우저는 위치 기능을 지원하지 않습니다.');
@@ -955,12 +1102,14 @@ function autoStartGps(auto) {
       manual: false
     };
     $('startName').value = START.name;
+    $('startAddress').value = '';
     $('startMeta').textContent = '✅ 현재위치: '
       + START.lat.toFixed(6) + ', ' + START.lng.toFixed(6);
 
   }, function (err) {
     START = { name: HOME.name, lat: HOME.lat, lng: HOME.lng, manual: false };
     $('startName').value = HOME.name;
+    $('startAddress').value = HOME.address;
     $('startMeta').textContent =
       '⚠️ 위치 권한 실패 (' + err.message + ') → 기본값 집(계동)으로 출발합니다.';
   }, { enableHighAccuracy: true, timeout: 10000 });
@@ -972,6 +1121,7 @@ $('btnGps').addEventListener('click', function () { autoStartGps(false); });
 $('btnStartCompany').addEventListener('click', function () {
   START = { name: COMPANY.name, lat: COMPANY.lat, lng: COMPANY.lng, manual: true };
   $('startName').value = COMPANY.name;
+  $('startAddress').value = COMPANY.address;
   $('startMeta').textContent = '🏢 회사 출발 — 좌표 자동 확인 중…';
 
   callApi({ action: 'geocode', stops: [{ name: COMPANY.name, address: COMPANY.address }] }, 60000)
@@ -992,6 +1142,7 @@ $('btnStartCompany').addEventListener('click', function () {
 $('btnStartHome').addEventListener('click', function () {
   START = { name: HOME.name, lat: HOME.lat, lng: HOME.lng, manual: true };
   $('startName').value = HOME.name;
+  $('startAddress').value = HOME.address;
   $('startMeta').textContent = '🏠 집(계동) 출발 — 좌표 자동 확인 중…';
 
   callApi({ action: 'geocode', stops: [{ name: HOME.name, address: HOME.address }] }, 60000)
@@ -1303,16 +1454,31 @@ async function drawMap(res) {
     bounds.extend(new kakao.maps.LatLng(lat, lng));
   }
 
+  /* ⭐ 핵심 수정:
+     기존 InfoWindow 내용에는 color가 지정되어 있지 않았습니다.
+     body의 color:var(--txt) = 밝은색(#f8fafc)을 그대로 상속받아
+     카카오의 흰색 안내 박스 안에서 글씨가 흰색으로 보였습니다.
+     전용 클래스 + !important로 글씨/배경을 명시합니다. */
+  function kakaoInfoHtml_(title, name) {
+    return '<div class="kakao-route-iw"'
+      + ' style="color:#0f172a !important;background:#fff !important;'
+      + 'padding:7px 10px;font-size:12px;line-height:1.45;'
+      + 'white-space:nowrap;box-sizing:border-box">'
+      + '<b style="color:#0f172a !important">' + title + '</b><br>'
+      + '<span style="color:#0f172a !important">' + esc(name) + '</span>'
+      + '</div>';
+  }
+
   marker(res.start.lat, res.start.lng,
-    '<div style="padding:6px 10px;font-size:12px"><b>🚩 출발</b><br>' + esc(res.start.name) + '</div>');
+    kakaoInfoHtml_('🚩 출발', res.start.name));
 
   (res.order || []).forEach(function (v, i) {
     marker(v.lat, v.lng,
-      '<div style="padding:6px 10px;font-size:12px"><b>' + (i + 1) + '번 경유</b><br>' + esc(v.name) + '</div>');
+      kakaoInfoHtml_((i + 1) + '번 경유', v.name));
   });
 
   marker(res.goal.lat, res.goal.lng,
-    '<div style="padding:6px 10px;font-size:12px"><b>★ 목적지</b><br>' + esc(res.goal.name) + '</div>');
+    kakaoInfoHtml_('★ 목적지', res.goal.name));
 
   map.setBounds(bounds);
   mapLayer = added;
