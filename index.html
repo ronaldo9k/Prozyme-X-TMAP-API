@@ -114,44 +114,6 @@
     color:#0f172a !important;
   }
 
-  /* ⭐ 모바일 배송지 행:
-     거래처명/주소를 넓게 쓰고
-     ① ▲▼  ② ★/📋  ③ ✕ 순서로 3줄 배치 */
-  @media (max-width: 600px){
-    .row{
-      grid-template-columns:34px minmax(0,1fr);
-      gap:8px;
-      padding:10px;
-    }
-    .row .f{
-      grid-column:2;
-      grid-row:1;
-      width:100%;
-    }
-    .row .acts{
-      grid-column:2;
-      grid-row:2;
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:6px;
-      width:100%;
-      margin-top:2px;
-    }
-    .row .acts .btn{
-      width:100%;
-      min-width:0;
-      height:32px;
-      font-size:13px;
-    }
-    .row .acts .btn[data-a="del"]{
-      grid-column:1;
-    }
-    .row input[type=text]{
-      font-size:14px;
-      padding:10px 11px;
-    }
-  }
-
   .msg{
     font-size:13px;padding:11px 12px;border-radius:10px;white-space:pre-wrap;
     line-height:1.6;word-break:break-word;
