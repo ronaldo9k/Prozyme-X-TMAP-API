@@ -254,6 +254,76 @@
     opacity:0;pointer-events:none;transition:opacity .25s;z-index:2000;
   }
   #toast.show{opacity:.96}
+
+  /* ══════════════════════════════════════════════════════════════════
+     ⭐ v4.2 추가 (요청 1·2·3·4)
+     · 기존 규칙은 "그대로" 두고 뒤에 추가만 합니다 (기존 디자인 보존)
+     ══════════════════════════════════════════════════════════════════ */
+
+  /* [요청 4] 총 거리 / 예상 소요 글자 시인성 강화 — 박스를 진하게 */
+  .sumbox .box{
+    background:rgba(8,20,45,.82) !important;
+    border:1px solid rgba(147,197,253,.72) !important;
+    box-shadow:0 4px 14px rgba(0,0,0,.45);
+  }
+  .sumbox .big{
+    color:#ffffff !important;
+    text-shadow:0 2px 6px rgba(0,0,0,.85) !important;
+  }
+  .sumbox .lbl{
+    color:#dbeafe !important;
+    font-weight:700;
+    text-shadow:0 1px 4px rgba(0,0,0,.85) !important;
+  }
+
+  /* [요청 2·4] 결과 목록 : [핀] [이름] [▲▼] [구간 시간·거리] */
+  .olist li{
+    display:grid;
+    grid-template-columns:24px minmax(0,1fr) auto auto;
+    gap:8px;
+    align-items:center;
+    font-size:13px;
+    padding:8px 0;
+    border-bottom:1px dashed rgba(255,255,255,.15);
+  }
+  .olist li .nm{
+    min-width:0;
+    font-weight:800;
+    color:#0f172a;
+    line-height:1.35;
+    word-break:break-word;
+  }
+  .olist li .legtxt{
+    font-size:11px;font-weight:800;white-space:nowrap;
+    color:#e2e8f0;
+    background:rgba(2,12,32,.62);
+    border:1px solid rgba(148,163,184,.40);
+    border-radius:8px;padding:3px 6px;
+  }
+  .olist li.seq-busy{opacity:.55}
+  .msg.ok .meta{color:#334155}
+  .msg.ok .hint{color:#475569}
+
+  /* [요청 2·4] ▲▼ 버튼 — 흰색/투명 아님. 시안(▲) + 앰버(▼) */
+  .ordbtns{display:flex;gap:4px}
+  .ordbtn{
+    width:31px;height:29px;padding:0;border-radius:8px;cursor:pointer;
+    font-size:14px;font-weight:900;line-height:1;
+    border:1px solid rgba(255,255,255,.55);
+    box-shadow:0 2px 6px rgba(0,0,0,.45);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .ordbtn:active{transform:scale(.94)}
+  .ordbtn:disabled{opacity:.30;cursor:not-allowed;box-shadow:none}
+  .ordbtn.up{background:linear-gradient(180deg,#22d3ee,#0e7490);color:#04222b}
+  .ordbtn.dn{background:linear-gradient(180deg,#fbbf24,#d97706);color:#3b2103}
+
+  /* [요청 3] 카카오내비 버튼 (카카오 옐로우) */
+  .btn.knavi{background:#fee500;color:#191600;border:1px solid #d9c400;font-weight:800}
+  .btn.knavi:active{transform:scale(.98)}
+
+  /* 순서 재계산 중 안내 */
+  .reroute-note{font-size:11px;font-weight:800;color:#92400e;margin:6px 0 2px}
 </style>
 </head>
 <body>
@@ -319,8 +389,13 @@
       <button class="btn tmap" id="btnTmap" style="flex:1">📱 티맵 앱으로 열기 (목적지)</button>
       <button class="btn ghost small" id="btnCopyOrder" disabled>📋 순서 목록 복사</button>
     </div>
+    <!-- ⭐ v4.2 추가 (요청 3): 티맵/복사 버튼 "바로 밑" — 카카오내비 앱으로 최적 경로 열기 -->
+    <div class="toolbar" style="margin-top:8px">
+      <button class="btn knavi" id="btnKnavi" style="flex:1">🟡 카카오 네비로 열기 (최적 경로 · 경유지 포함)</button>
+    </div>
     <div class="legend meta">
       · 목적지만 입력한 뒤 <b>📱 티맵 앱으로 열기</b>를 누르면 최적화 없이 바로 티맵이 열립니다.<br>
+      · <b>🟡 카카오 네비로 열기</b>는 출발지·경유지·목적지를 카카오내비 앱으로 함께 전달합니다 (경유지 최대 3곳 · 모바일 전용).<br>
       · 카카오 실시간 교통 정보로 총 시간/거리를 먼저 확인합니다.<br>
       · 티맵 딥링크는 공식적으로 경유지를 지원하지 않아 <b>목적지 1곳만</b> 전달됩니다.<br>
       · 각 배송지의 📋 복사 버튼으로 주소를 복사 → 티맵에서 붙여넣어 경유지를 순서대로 추가하세요.
@@ -343,7 +418,7 @@
    ⚙️ 1. 설정 — 여기만 수정하세요
    ============================================================================ */
 const GAS_URL =
-  'https://script.google.com/macros/s/AKfycbxvHu6H_vMn0gaZt6hB4s3uWYK9H4vGwG8PABaog6cxasNVNT_lx99KHCEtLtglX_orXQ/exec';
+  'https://script.google.com/macros/s/AKfycbw50T8R9U5NDyJPlnjHaAbWTxySoGGZUrZ29uPOZK9K1SOGhPRHcQ7blR8pPzaiVaXpKQ/exec';
 const KAKAO_JS_KEY = 'cd143a1f0fdb6106f499b67535d11b2f';
 const MAX_ROWS = 6;
 
@@ -357,6 +432,10 @@ let START    = { name: '현재위치', lat: HOME.lat, lng: HOME.lng, manual: fal
 let RESULT   = null;
 let map      = null;
 let mapLayer = null;
+/* ⭐ v4.2 추가: 결과화면 순서변경(▲▼) 재계산 상태 */
+let REROUTE_BUSY    = false;
+let REROUTE_PENDING = false;
+let LAST_SWAP       = null;
 
 /* ============================================================================
    ⚙️ 2. GAS 호출 (POST text/plain → CORS 프리플라이트 회피 / 실패 시 JSONP 폴백)
@@ -1289,6 +1368,7 @@ $('btnRun').addEventListener('click', async function () {
     }
 
     RESULT = res;
+    rebuildSeq_(res);              // ⭐ v4.2 (요청 2): 결과 순서배열 [출 ~ 경유지 ~ ☆] 생성
     syncResultGeoToRows(res);
 
     $('btnCopyOrder').disabled = false;
@@ -1403,11 +1483,23 @@ function loadKakaoSDK() {
 }
 
 // traffic_state → 색상 (카카오 기준: 1 원활 / 2 서서히 / 3·4 정체·통제 / 0 정보없음)
-function trafficColor(state) {
-  if (state === 1) return '#1976d2';   // 원활 - 파랑
-  if (state === 2) return '#f59e0b';   // 서서히 주행 - 주황
-  if (state === 3 || state === 4) return '#dc2626'; // 정체 - 빨강
-  return '#2563eb';
+function trafficColor(state, speed) {
+  const s = Number(state);
+
+  if (s === 1) return '#1976d2';   // 원활 - 파랑
+  if (s === 2) return '#f59e0b';   // 서서히 주행 - 주황
+  if (s === 3 || s === 4) return '#dc2626'; // 정체·통제 - 빨강
+
+  // ⭐ v4.2 (요청 1): traffic_state 가 0(정보없음)으로 오는 구간은
+  //    함께 내려오는 traffic_speed(km/h) 로 색을 추정합니다.
+  //    → 어떤 이유로 state 가 비어 있어도 "빨강 한 줄"이 되지 않습니다.
+  const v = Number(speed);
+  if (isFinite(v) && v > 0) {
+    if (v < 15) return '#dc2626';  // 정체
+    if (v < 30) return '#f59e0b';  // 서서히
+    return '#1976d2';              // 원활
+  }
+  return '#2563eb';                // 완전 미상 → 기본 파랑
 }
 
 async function drawMap(res) {
@@ -1436,7 +1528,7 @@ async function drawMap(res) {
     const line = new kakao.maps.Polyline({
       path: road.coords.map(function (c) { return new kakao.maps.LatLng(c[0], c[1]); }),
       strokeWeight: 5,
-      strokeColor: trafficColor(road.state),
+      strokeColor: trafficColor(road.state, road.speed),   // ⭐ v4.2: 속도 폴백 포함
       strokeOpacity: 0.85
     });
     line.setMap(map);
@@ -1492,7 +1584,8 @@ function renderOrder(res, mapNote) {
 
   let head = '<b>'
     + (res.single ? '✅ 목적지 경로 준비 완료 (경유지 없음 — 실시간 교통 반영)'
-                  : '✅ 경유지 순서 최적화 완료 (카카오 실시간 교통 반영)')
+                  : (res.manual ? '🎛️ 내가 지정한 순서로 계산된 경로 (카카오 실시간 교통 반영)'
+                                : '✅ 경유지 순서 최적화 완료 (카카오 실시간 교통 반영)'))
     + '</b>';
 
   head += '<div class="sumbox">'
@@ -1503,34 +1596,357 @@ function renderOrder(res, mapNote) {
     +   '<div class="lbl">통요금</div></div>' : '')
     + '</div>';
 
-  let html = head + '<ul class="olist">'
-    + '<li><span class="pin" style="background:#2563eb">출</span>' + esc(res.start.name) + '</li>';
+  // ⭐ v4.2 (요청 2): [출발 ~ 경유지 ~ 목적지] 전체를 ▲▼ 로 재정렬
+  const seq  = (res.seq && res.seq.length >= 2) ? res.seq : null;
+  const legs = res.legs || [];
 
-  (res.order || []).forEach(function (v, i) {
+  let html = head;
 
-    const leg = (res.legs && res.legs[i]) || null;
+  if (REROUTE_BUSY) {
+    html += '<div class="reroute-note">⏳ 순서를 반영해 시간·거리를 다시 계산하는 중…</div>';
+  } else {
+    html += '<div class="meta" style="margin:2px 0 4px">'
+      + '▲▼ 로 순서를 바꾸면 <b>전체 시간·거리</b>와 <b>구간별 시간·거리</b>가 즉시 다시 계산됩니다.'
+      + '</div>';
+  }
 
-    html += '<li><span class="pin">' + (i + 1) + '</span>' + esc(v.name)
-      + (leg ? '<span class="meta" style="margin-left:auto">'
-          + (leg.distance / 1000).toFixed(1) + 'km · ' + Math.round(leg.duration / 60) + '분</span>' : '')
-      + '</li>';
-  });
+  if (!seq) {
+    /* 안전 폴백 — 기존과 동일한 목록 형태 */
+    html += '<ul class="olist">'
+      + '<li><span class="pin" style="background:#2563eb">출</span>'
+      +   '<span class="nm">' + esc(res.start.name) + '</span></li>';
 
-  const lastLeg = (res.legs && res.legs.length) ? res.legs[res.legs.length - 1] : null;
+    (res.order || []).forEach(function (v, i) {
+      const leg = legs[i] || null;
+      html += '<li><span class="pin">' + (i + 1) + '</span>'
+        + '<span class="nm">' + esc(v.name) + '</span>'
+        + (leg ? '<span class="legtxt">' + (leg.distance / 1000).toFixed(1) + 'km · '
+            + Math.round(leg.duration / 60) + '분 →</span>' : '<span></span>')
+        + '</li>';
+    });
 
-  html += '<li><span class="pin" style="background:#dc2626">★</span>' + esc(res.goal.name)
-    + (lastLeg ? '<span class="meta" style="margin-left:auto">'
-        + (lastLeg.distance / 1000).toFixed(1) + 'km · ' + Math.round(lastLeg.duration / 60) + '분</span>' : '')
-    + '<span class="meta" style="margin-left:6px">목적지</span></li>'
-    + '</ul>';
+    const lastLeg = legs.length ? legs[legs.length - 1] : null;
+    html += '<li><span class="pin" style="background:#dc2626">★</span>'
+      + '<span class="nm">' + esc(res.goal.name) + '</span>'
+      + (lastLeg ? '<span class="legtxt">' + (lastLeg.distance / 1000).toFixed(1) + 'km · '
+          + Math.round(lastLeg.duration / 60) + '분</span>' : '<span></span>')
+      + '</li></ul>';
+
+  } else {
+
+    html += '<ul class="olist">';
+
+    seq.forEach(function (n, i) {
+
+      const first = (i === 0);
+      const last  = (i === seq.length - 1);
+
+      const pinTxt = first ? '출' : (last ? '★' : String(i));
+      const pinBg  = first ? '#2563eb' : (last ? '#dc2626' : '#ea580c');
+
+      // legs[i] = seq[i] → seq[i+1] (이 지점에서 "다음" 지점까지)
+      const leg = (!last && legs[i]) ? legs[i] : null;
+
+      const nm = esc(n.name || '이름없음')
+        + (last ? ' <span style="color:#b91c1c">(목적지)</span>' : '');
+
+      html += '<li' + (REROUTE_BUSY ? ' class="seq-busy"' : '') + '>'
+        + '<span class="pin" style="background:' + pinBg + '">' + pinTxt + '</span>'
+        + '<span class="nm">' + nm + '</span>'
+        + '<span class="ordbtns">'
+        +   '<button class="ordbtn up" data-seq="' + i + '" data-dir="-1"'
+        +     ((first || REROUTE_BUSY) ? ' disabled' : '') + ' title="위로 이동">▲</button>'
+        +   '<button class="ordbtn dn" data-seq="' + i + '" data-dir="1"'
+        +     ((last || REROUTE_BUSY) ? ' disabled' : '') + ' title="아래로 이동">▼</button>'
+        + '</span>'
+        + (leg ? '<span class="legtxt">' + (leg.distance / 1000).toFixed(1) + 'km · '
+            + Math.round(leg.duration / 60) + '분 →</span>' : '<span></span>')
+        + '</li>';
+    });
+
+    html += '</ul>';
+  }
 
   html += '<div class="hint">· 경로 색상: <span style="color:#1976d2">파랑=원활</span> / '
     + '<span style="color:#f59e0b">주황=서서히</span> / '
-    + '<span style="color:#dc2626">빨강=정체</span> (실시간)</div>';
+    + '<span style="color:#dc2626">빨강=정체</span> (실시간)<br>'
+    + '· <b>▲▼</b> 순서변경은 <b>경유지뿐 아니라 출발지(출)·목적지(☆)</b>에도 적용됩니다. '
+    + '맨 위가 출발지, 맨 아래가 목적지가 됩니다.</div>';
 
   if (mapNote) html += mapNote;
 
   showResult(html, 'ok');
+}
+
+/* ============================================================================
+   ⚙️ 11-1. ⭐ v4.2 추가 — (요청 2) 결과화면 순서변경 ▲▼  +  (요청 3) 카카오내비 열기
+   · 기존 11번/12번 코드는 손대지 않고 "추가"만 합니다.
+   · ▲▼ 를 누르면 같은 GAS 'route' 를 fixedOrder=true 로 1회 호출합니다.
+     좌표를 함께 보내므로 GAS가 지오코딩을 건너뛰어 즉시 계산됩니다(= 기존과 동일한 속도).
+   ============================================================================ */
+
+/* ── 결과 → 순서배열 [출발, ...경유지..., 목적지] ── */
+function rebuildSeq_(res) {
+  const seq = [];
+
+  seq.push({
+    kind: 'start',
+    name: (res.start && res.start.name) ? res.start.name : '출발지',
+    address: '',
+    lat: res.start ? res.start.lat : 0,
+    lng: res.start ? res.start.lng : 0
+  });
+
+  (res.order || []).forEach(function (v) {
+    seq.push({ kind: 'via', name: v.name, address: v.address || '', lat: v.lat, lng: v.lng });
+  });
+
+  if (res.goal) {
+    seq.push({
+      kind: 'goal', name: res.goal.name, address: res.goal.address || '',
+      lat: res.goal.lat, lng: res.goal.lng
+    });
+  }
+
+  res.seq = seq;
+}
+
+/* ── ▲▼ 클릭 → 인접 항목과 자리 교환 후 재계산 ── */
+function moveSeq_(i, dir) {
+  if (!RESULT || !RESULT.seq) return;
+
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= RESULT.seq.length) return;
+
+  const t = RESULT.seq[i];
+  RESULT.seq[i] = RESULT.seq[j];
+  RESULT.seq[j] = t;
+
+  LAST_SWAP = { i: i, j: j };
+  rerouteSeq_();
+}
+
+/* 결과 영역은 매번 다시 그려지므로 "문서 위임" 방식으로 연결 */
+document.addEventListener('click', function (ev) {
+  const b = (ev.target && ev.target.closest) ? ev.target.closest('.ordbtn') : null;
+  if (!b || b.disabled) return;
+  moveSeq_(Number(b.dataset.seq), Number(b.dataset.dir));
+});
+
+/* ── 지정한 순서 그대로 카카오 경로 1회 재계산 ── */
+async function rerouteSeq_() {
+
+  if (!RESULT || !RESULT.seq || RESULT.seq.length < 2) return;
+  if (REROUTE_BUSY) { REROUTE_PENDING = true; return; }
+
+  REROUTE_BUSY = true;
+  renderOrder(RESULT, '');            // 버튼 즉시 비활성 + "계산 중" 표시 (체감 속도↑)
+
+  const seq       = RESULT.seq.slice();
+  const startNode = seq[0];
+  const rest      = seq.slice(1);     // 마지막이 목적지
+
+  let newRes = null;
+  let errMsg = '';
+
+  try {
+    const res = await callApi({
+      action: 'route',
+      start: { name: startNode.name, lat: startNode.lat, lng: startNode.lng },
+      stops: rest.map(function (n) {
+        return { name: n.name, address: n.address || '', lat: n.lat, lng: n.lng };
+      }),
+      fixedOrder: true
+    }, 120000);
+
+    if (!res || !res.ok) errMsg = (res && res.error) || '응답 오류';
+    else newRes = res;
+
+  } catch (err) {
+    errMsg = (err && err.message) || '연결을 확인하세요.';
+  }
+
+  REROUTE_BUSY = false;
+
+  if (newRes) {
+
+    RESULT = newRes;
+    rebuildSeq_(RESULT);
+
+    $('btnCopyOrder').disabled = false;
+    updateTmapBtn();
+
+    let mapNote = '';
+    try { await drawMap(RESULT); }
+    catch (mapErr) {
+      mapNote = '<div class="meta" style="margin-top:6px">⚠️ 지도 표시 실패: '
+        + esc(mapErr.message) + ' (시간/거리·복사 기능은 정상)</div>';
+    }
+
+    renderOrder(RESULT, mapNote);
+    showToast('🔄 순서를 반영해 다시 계산했습니다.');
+
+  } else {
+    // 실패 → 방금 바꾼 순서를 원래대로 되돌리고 이전 화면 복구
+    if (LAST_SWAP && RESULT && RESULT.seq) {
+      const a = LAST_SWAP.i, b = LAST_SWAP.j;
+      if (RESULT.seq[a] && RESULT.seq[b]) {
+        const tt = RESULT.seq[a];
+        RESULT.seq[a] = RESULT.seq[b];
+        RESULT.seq[b] = tt;
+      }
+    }
+    renderOrder(RESULT, '');
+    showToast('❌ 순서 재계산 실패: ' + errMsg);
+  }
+
+  if (REROUTE_PENDING) { REROUTE_PENDING = false; rerouteSeq_(); }
+}
+
+/* ============================================================================
+   ⭐ v4.2 추가 (요청 3) — 카카오내비 앱으로 최적 경로 열기
+   · Kakao.Navi.start() 사용 (카카오 JS SDK)
+   · kakao.min.js 는 "버튼을 누를 때만" 불러옵니다 → 첫 로딩 속도 영향 없음
+   ============================================================================ */
+const KAKAO_JS_SDK_SRC = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js';
+let KJS_STATE   = 'idle';   // idle | loading | ready | error
+let KJS_WAITERS = [];
+
+function loadKakaoJsSdk() {
+  return new Promise(function (resolve, reject) {
+
+    if (window.Kakao && window.Kakao.Navi) { KJS_STATE = 'ready'; resolve(); return; }
+    if (KJS_STATE === 'error') { reject(new Error('카카오 JS SDK 로드 실패')); return; }
+
+    KJS_WAITERS.push({ resolve: resolve, reject: reject });
+    if (KJS_STATE === 'loading') return;
+    KJS_STATE = 'loading';
+
+    const s = document.createElement('script');
+    s.src = KAKAO_JS_SDK_SRC;
+
+    s.onload = function () {
+      try {
+        if (!window.Kakao) throw new Error('Kakao 객체를 찾지 못했습니다.');
+        if (window.Kakao.isInitialized && !window.Kakao.isInitialized()) {
+          window.Kakao.init(KAKAO_JS_KEY);
+        }
+        KJS_STATE = 'ready';
+        KJS_WAITERS.forEach(function (w) { w.resolve(); });
+        KJS_WAITERS = [];
+      } catch (e) {
+        KJS_STATE = 'error';
+        KJS_WAITERS.forEach(function (w) { w.reject(e); });
+        KJS_WAITERS = [];
+      }
+    };
+
+    s.onerror = function () {
+      KJS_STATE = 'error';
+      const err = new Error('카카오 JS SDK 스크립트를 불러오지 못했습니다. (네트워크·차단앱 확인)');
+      KJS_WAITERS.forEach(function (w) { w.reject(err); });
+      KJS_WAITERS = [];
+    };
+
+    document.head.appendChild(s);
+  });
+}
+
+function isMobileDevice_() {
+  const ua = navigator.userAgent || '';
+  return /Android|iPhone|iPad|iPod|Mobile|Windows Phone|webOS|BlackBerry/i.test(ua);
+}
+
+/* 목적지 1건 좌표 확보 (기존 티맵 버튼과 동일한 방식) */
+async function ensureGoalGeo_(goal) {
+  if (goal.geo && goal.geo.ok && goal.geo.lat && goal.geo.lng) return;
+
+  const name = (goal.name || '').trim() || '목적지';
+  const addr = (goal.address || '').trim();
+
+  const res = await callApi({ action: 'geocode', stops: [{ name: name, address: addr }] }, 60000);
+  const g = (res.results || [])[0];
+
+  if (g && g.ok) {
+    goal.geo = g;
+    if (g.matched) goal.matchedAddress = g.matched;
+    updateRowStatus(goal.id);
+  }
+}
+
+async function openKakaoNavi_() {
+
+  if (!isMobileDevice_()) {
+    showToast('📱 카카오내비 실행은 모바일에서만 됩니다. PC에서는 경로만 확인하세요.');
+    return;
+  }
+
+  const btn = $('btnKnavi');
+  btn.disabled = true;
+
+  try {
+
+    let goal = null;
+    let vias = [];
+
+    if (RESULT && RESULT.seq && RESULT.seq.length) {
+      const seq = RESULT.seq;
+      goal = seq[seq.length - 1];
+      vias = seq.slice(1, seq.length - 1);
+    } else {
+      const g = goalRow();
+      if (!g) { showToast('목적지를 먼저 입력하세요.'); return; }
+      await ensureGoalGeo_(g);
+      if (!g.geo || !g.geo.ok) { showToast('❌ 목적지 좌표 확인 실패 — 주소를 확인하세요.'); return; }
+      goal = { name: (g.name || '목적지'), lat: g.geo.lat, lng: g.geo.lng };
+    }
+
+    if (!goal || !goal.lat || !goal.lng) { showToast('❌ 목적지 좌표를 확인할 수 없습니다.'); return; }
+
+    showToast('⏳ 카카오내비 여는 중…');
+    await loadKakaoJsSdk();
+
+    const settings = {
+      name: String(goal.name || '목적지'),
+      x: Number(goal.lng),
+      y: Number(goal.lat),
+      coordType: 'wgs84',
+      vehicleType: 1,
+      rpOption: 100,
+      routeInfo: false
+    };
+
+    // 경로의 출발지도 함께 전달 (순서변경으로 출발지가 바뀐 경우까지 반영)
+    if (RESULT && RESULT.seq && RESULT.seq[0]) {
+      settings.sX = Number(RESULT.seq[0].lng);
+      settings.sY = Number(RESULT.seq[0].lat);
+    }
+
+    // 경유지 — 카카오내비는 최대 3곳까지 전달 가능
+    if (vias.length) {
+      settings.viaPoints = vias.slice(0, 3).map(function (v) {
+        return { name: String(v.name || '경유지'), x: Number(v.lng), y: Number(v.lat) };
+      });
+      if (vias.length > 3) {
+        showToast('ℹ️ 카카오내비는 경유지 3곳까지 전달됩니다. 나머지는 📋 순서목록을 이용하세요.');
+      }
+    }
+
+    Kakao.Navi.start(settings);
+
+  } catch (err) {
+    showToast('❌ 카카오내비 실행 실패: ' + ((err && err.message) || 'JS 키·도메인을 확인하세요.'));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('btnKnavi').addEventListener('click', function () { openKakaoNavi_(); });
+
+function updateKnaviBtn() {
+  const b = $('btnKnavi');
+  if (!b) return;
+  b.disabled = !(RESULT || goalRow());
 }
 
 /* ============================================================================
@@ -1551,6 +1967,7 @@ function goalRow() {
 
 function updateTmapBtn() {
   $('btnTmap').disabled = !goalRow();
+  updateKnaviBtn();   // ⭐ v4.2 (요청 3): 카카오내비 버튼도 함께 활성/비활성
 }
 
 /* ── 행이 바뀌면 이전 최적화 결과는 폐기 (티맵 버튼은 계속 사용 가능) ── */
@@ -1665,5 +2082,6 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js').catch(function () {});
 }
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
