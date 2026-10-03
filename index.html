@@ -95,18 +95,28 @@
 
 @media (max-width:600px){
 
-  /* ⭐ 즐겨찾기 칩은 모바일에서 기존 위치(배송지 제목 바로 아래)를 유지 */
-  .delivery-card{
-    display:flex;
-    flex-direction:column;
-  }
-  .delivery-card h2{order:1}
-  .delivery-card #presetChips{order:2}
-  .delivery-card #presetAddBar{order:3}
-  .delivery-card #rows{order:4}
-  .delivery-card > .toolbar:not(#presetAddBar){order:5}
-  .delivery-card > .hint{order:6}
+  /* ⭐ 즐겨찾기 칩은 PC와 동일하게 안내문 바로 아래에 표시 */
+  /*    배송지 입력 → 배송지/추가영역 → 안내문 → 즐겨찾기 순서 */
 
+  /* ⭐ 출발지 3개 버튼은 모바일에서도 한 줄에 표시 */
+  #btnGps,
+  #btnStartHome,
+  #btnStartCompany{
+    flex:1;
+    min-width:0;
+    white-space:nowrap;
+    padding-left:6px;
+    padding-right:6px;
+  }
+
+  /* ⭐ 모바일 제목은 2줄: 첫 줄 제목 / 둘째 줄 FENOMENO RONALDO */
+  header h1 .title-main,
+  header h1 .title-sub{
+    display:block;
+  }
+  header h1 .title-sub{
+    margin-top:2px;
+  }
 
   /* ⭐ 모바일 기존 레이아웃 그대로 유지 */
   .acts{
@@ -260,7 +270,7 @@
 <header>
   <div class="hrow">
     <div>
-      <h1>🚗 푸로찜 최적경로 <span style="color:#60a5fa">FENOMENO RONALDO</span></h1>
+      <h1><span class="title-main">🚗 푸로찜 최적경로</span> <span class="title-sub" style="color:#60a5fa">FENOMENO RONALDO</span></h1>
       <p>카카오 실시간 경로 확인 → 주소 복사 → 티맵 최종 주행</p>
     </div>
     <button class="btn ghost small" id="btnTest">🔗 연결테스트</button>
@@ -278,9 +288,9 @@
         <button class="btn small" id="btnStartAddress">🔎 주소로 출발지 설정</button>
       </div>
       <div class="toolbar">
-        <button class="btn small" id="btnGps">📍 현재 위치로 출발</button>
-        <button class="btn ghost small" id="btnStartHome">🏠 집(계동)에서 출발</button>
-        <button class="btn ghost small" id="btnStartCompany">🏢 회사에서 출발</button>
+        <button class="btn small" id="btnGps">📍 현재위치</button>
+        <button class="btn ghost small" id="btnStartHome">🏠 집(계동)출발</button>
+        <button class="btn ghost small" id="btnStartCompany">🏢 회사출발</button>
       </div>
       <div class="meta" id="startMeta">앱을 열면 자동으로 현재 위치로 출발합니다. 실패 시 집(계동) 기본값. 주소를 직접 검색해 출발지로 설정할 수도 있습니다.</div>
     </div>
@@ -306,7 +316,7 @@
       <b>📋</b> 버튼으로 주소를 복사 → 티맵 앱에 붙여넣어 경유지를 추가하세요.<br>
       <b>▲▼</b> 순서변경 · <b>★</b> 목적지 지정 · <b>✕</b> 삭제
     </div>
-    <!-- ⭐ PC에서는 안내문 바로 아래, 모바일에서는 기존 위치로 표시 -->
+    <!-- ⭐ PC/모바일 공통: 안내문 바로 아래에 즐겨찾기 표시 -->
     <div class="chips" id="presetChips"></div>
   </div>
 
