@@ -306,22 +306,27 @@
      (기존 .olist li 규칙은 그대로 두고, seqlist 에서만 열을 하나 늘립니다) */
   .olist.seqlist li{grid-template-columns:auto 24px minmax(0,1fr) auto auto;cursor:pointer}
   /* ⭐ v4.3: 드래그 핸들 (터치 스크롤과 충돌하지 않도록 touch-action:none) */
+  /* ⭐ v4.4: ⠿ 드래그 핸들 시인성 강화 (기존은 흰반투명이라 밝은 카드에서 안 보였습니다) */
   .drag-handle{
     display:inline-flex;align-items:center;justify-content:center;
-    width:22px;height:26px;border-radius:7px;
-    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.38);
-    color:#e2e8f0;font-size:13px;font-weight:900;line-height:1;
+    width:24px;height:28px;border-radius:8px;
+    background:linear-gradient(180deg,#fbbf24,#d97706);
+    border:1px solid #b45309;
+    color:#3b2103;font-size:15px;font-weight:900;line-height:1;
+    box-shadow:0 2px 7px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.55);
     cursor:grab;touch-action:none;
     user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
   }
-  .drag-handle:active{cursor:grabbing;transform:scale(.94)}
+  .drag-handle:active{cursor:grabbing;transform:scale(.94);
+    background:linear-gradient(180deg,#fcd34d,#f59e0b)}
+  .olist li.dragging .drag-handle{background:linear-gradient(180deg,#fde68a,#f59e0b)}
   /* ⭐ v4.3: 드래그 중 / 클릭으로 선택된 행 */
   .olist li.dragging{opacity:.78;background:rgba(245,158,11,.32);border-radius:10px;
     box-shadow:inset 0 0 0 1px rgba(251,191,36,.9)}
   .olist li.sel{background:rgba(59,130,246,.30);border-radius:10px;
     box-shadow:inset 0 0 0 1px rgba(147,197,253,.85)}
   /* ⭐ v4.3: 순서만 바꾼(재계산 전) 상태 — 구간 시간/거리는 이전 계산값이므로 흐리게 */
-  .olist.dirty .legtxt{opacity:.42}
+  .olist.seq-dirty .legtxt{opacity:.42}
   .dragbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
   .dirty{
     display:none;font-size:11px;font-weight:900;color:#7c2d12;
@@ -1629,6 +1634,73 @@ async function drawMap(res) {
   mapLayer = added;
 }
 
+/* ============================================================================
+   ⭐ v4.4 — 순서목록 전용 렌더러
+   · 기존 renderOrder 의 목록 부분을 그대로 떼어낸 것만입니다 (디자인·기능 변경 ✖).
+   · 순서 변경(⠿ 드래그 / 행 클릭 / ▲▼) 시에는 이 부분만 갈아끼워
+     결과화면(출·경유·☆)이 사라지지 않고 계속 순서를 바꿀 수 있습니다.
+   · 재계산은 아래 버튼 한 번으로만 실행됩니다 (API 0회).
+   ============================================================================ */
+function seqBoxHtml_(res) {
+
+  const seq  = (res.seq && res.seq.length >= 2) ? res.seq : null;
+  const legs = res.legs || [];
+  if (!seq) return '';
+
+  let html = '<ul class="olist seqlist' + (SEQ_DIRTY ? ' seq-dirty' : '') + '">';
+
+  seq.forEach(function (n, i) {
+
+    const first = (i === 0);
+    const last  = (i === seq.length - 1);
+
+    const pinTxt = first ? '출' : (last ? '★' : String(i));
+    const pinBg  = first ? '#2563eb' : (last ? '#dc2626' : '#ea580c');
+
+    // legs[i] = seq[i] → seq[i+1] (이 지점에서 "다음" 지점까지)
+    const leg = (!last && legs[i]) ? legs[i] : null;
+
+    const nm = esc(n.name || '이름없음')
+      + (last ? ' <span style="color:#b91c1c">(목적지)</span>' : '');
+
+    html += '<li data-seq="' + i + '"'
+      + ' class="' + (REROUTE_BUSY ? 'seq-busy' : '')
+      + (SEQ_SEL === i ? ' sel' : '') + '"'
+      + ' title="클릭하면 이 위치로 이동합니다">'
+      + '<span class="drag-handle" title="잡고 위·아래로 끌어 이동">⠿</span>'
+      + '<span class="pin" style="background:' + pinBg + '">' + pinTxt + '</span>'
+      + '<span class="nm">' + nm + '</span>'
+      + '<span class="ordbtns">'
+      +   '<button class="ordbtn up" data-seq="' + i + '" data-dir="-1"'
+      +     ((first || REROUTE_BUSY) ? ' disabled' : '') + ' title="한 칸 위로">▲</button>'
+      +   '<button class="ordbtn dn" data-seq="' + i + '" data-dir="1"'
+      +     ((last || REROUTE_BUSY) ? ' disabled' : '') + ' title="한 칸 아래로">▼</button>'
+      + '</span>'
+      + (leg ? '<span class="legtxt">' + (leg.distance / 1000).toFixed(1) + 'km · '
+          + Math.round(leg.duration / 60) + '분 →</span>' : '<span></span>')
+      + '</li>';
+  });
+
+  html += '</ul>';
+
+  /* ⭐ v4.4 (요청 2): 버튼은 하나로 합치고, 순서를 다 바꾼 뒤 딱 1번만 재계산 */
+  html += '<div class="dragbar">'
+    + '<button class="btn recalc small" id="btnRecalc"'
+    +   ((SEQ_DIRTY && !REROUTE_BUSY) ? '' : ' disabled')
+    +   '>🔄 변경된 순서대로 재계산</button>'
+    + '<span class="dirty' + (SEQ_DIRTY ? ' on' : '') + '">순서 변경됨 · 재계산 필요</span>'
+    + '</div>';
+
+  return html;
+}
+
+/* ⭐ v4.4: 순서만 바뀜을 때 #seqBox 만 갈아끼웁니다 (결과화면 유지 · API 0회) */
+function paintSeqBox_() {
+  const box = document.getElementById('seqBox');
+  if (!box || !RESULT) return;
+  box.innerHTML = seqBoxHtml_(RESULT);
+}
+
 function renderOrder(res, mapNote) {
 
   const km  = (res.totalDistanceM || 0) / 1000;
@@ -1660,7 +1732,7 @@ function renderOrder(res, mapNote) {
     /* ⭐ v4.3 (요청 개선 2): 순서는 화면에서만 바꾸고, 계산은 버튼 1번 */
     html += '<div class="meta" style="margin:2px 0 4px">'
       + '순서 변경은 <b>⠿ 끌기</b> · <b>행 클릭(선택→이동)</b> · <b>▲▼</b> 로 하세요. '
-      + '바꾸는 동안에는 계산하지 않아 빠르고, 아래 <b>🔄 순서대로 다시 계산</b> 버튼을 누르면 <b>딱 1번</b>만 계산합니다.'
+      + '바꾸는 동안에는 계산하지 않아 빠르고, 목록은 그대로 유지되어 계속 순서를 바꿀 수 있습니다. 끝난 뒤 <b>🔄 변경된 순서대로 재계산</b> 버튼 <b>1개</b>를 누르면 <b>딱 1번</b>만 계산합니다.'
       + '</div>';
   }
 
@@ -1688,49 +1760,8 @@ function renderOrder(res, mapNote) {
 
   } else {
 
-    /* ⭐ v4.3 (요청 개선 2): ⠿ 드래그 핸들 + 행 클릭 이동 + 기존 ▲▼ 를 모두 제공 */
-    html += '<ul class="olist seqlist' + (SEQ_DIRTY ? ' dirty' : '') + '">';
-
-    seq.forEach(function (n, i) {
-
-      const first = (i === 0);
-      const last  = (i === seq.length - 1);
-
-      const pinTxt = first ? '출' : (last ? '★' : String(i));
-      const pinBg  = first ? '#2563eb' : (last ? '#dc2626' : '#ea580c');
-
-      // legs[i] = seq[i] → seq[i+1] (이 지점에서 "다음" 지점까지)
-      const leg = (!last && legs[i]) ? legs[i] : null;
-
-      const nm = esc(n.name || '이름없음')
-        + (last ? ' <span style="color:#b91c1c">(목적지)</span>' : '');
-
-      html += '<li data-seq="' + i + '"'
-        + ' class="' + (REROUTE_BUSY ? 'seq-busy' : '')
-        + (SEQ_SEL === i ? ' sel' : '') + '"'
-        + ' title="클릭하면 이 위치로 이동합니다">'
-        + '<span class="drag-handle" title="잡고 위·아래로 끌어 이동">⠿</span>'
-        + '<span class="pin" style="background:' + pinBg + '">' + pinTxt + '</span>'
-        + '<span class="nm">' + nm + '</span>'
-        + '<span class="ordbtns">'
-        +   '<button class="ordbtn up" data-seq="' + i + '" data-dir="-1"'
-        +     ((first || REROUTE_BUSY) ? ' disabled' : '') + ' title="한 칸 위로">▲</button>'
-        +   '<button class="ordbtn dn" data-seq="' + i + '" data-dir="1"'
-        +     ((last || REROUTE_BUSY) ? ' disabled' : '') + ' title="한 칸 아래로">▼</button>'
-        + '</span>'
-        + (leg ? '<span class="legtxt">' + (leg.distance / 1000).toFixed(1) + 'km · '
-            + Math.round(leg.duration / 60) + '분 →</span>' : '<span></span>')
-        + '</li>';
-    });
-
-    html += '</ul>';
-
-    /* ⭐ v4.3 (요청 개선 2): 순서를 다 바꾼 뒤 이 버튼 1번으로만 재계산 */
-    html += '<div class="dragbar">'
-      + '<button class="btn recalc small" id="btnRecalc"'
-      +   ((SEQ_DIRTY && !REROUTE_BUSY) ? '' : ' disabled') + '>🔄 순서대로 다시 계산</button>'
-      + '<span class="dirty' + (SEQ_DIRTY ? ' on' : '') + '">순서 변경됨 · 재계산 필요</span>'
-      + '</div>';
+    /* ⭐ v4.4: 순서목록은 #seqBox 안에서만 다시 그립니다 (결과화면 · 지도 · 헤더 그대로 유지) */
+    html += '<div id="seqBox">' + seqBoxHtml_(res) + '</div>';
   }
 
   html += '<div class="hint">· 경로 색상: <span style="color:#1976d2">파랑=원활</span> / '
@@ -1739,7 +1770,7 @@ function renderOrder(res, mapNote) {
     + '<span style="color:#dc2626">빨강=정체</span> (실시간)<br>'
     + '· 순서변경은 <b>⠿ 드래그</b> · <b>행 클릭 이동</b> · <b>▲▼</b> 모두 사용할 수 있고, '
     + '<b>경유지뿐 아니라 출발지(출)·목적지(☆)</b>에도 적용됩니다. 맨 위가 출발지, 맨 아래가 목적지입니다.<br>'
-    + '· 순서를 바꾼 뒤에는 <b>🔄 순서대로 다시 계산</b> 버튼을 눌러야 전체·구간 시간/거리가 갱신됩니다.</div>';
+    + '· 순서를 바꾼 뒤에는 <b>🔄 변경된 순서대로 재계산</b> 버튼을 눌러야 전체·구간 시간/거리가 갱신됩니다.</div>';
 
   if (mapNote) html += mapNote;
 
@@ -1800,7 +1831,7 @@ function applyMove_(from, to) {
   LAST_SWAP = null;
   SEQ_DIRTY = true;          // ⭐ "순서 변경됨" 표시만 (계산은 버튼에서)
   SEQ_SEL   = to;            // 옮긴 항목을 선택 상태로 유지
-  renderOrder(RESULT, '');   // 화면만 다시 그림 (API 0회)
+  paintSeqBox_();            // ⭐ v4.4: 목록만 갈아끼움 (API 0회 · 결과화면 유지)
   return true;
 }
 
@@ -1813,8 +1844,8 @@ function moveSeq_(i, dir) {
 /* 행 클릭 이동: 한 행을 클릭해 선택 → 다른 행을 클릭하면 그 위치로 이동 */
 function clickMoveSeq_(i) {
   if (!RESULT || !RESULT.seq) return;
-  if (SEQ_SEL === null) { SEQ_SEL = i; renderOrder(RESULT, ''); return; }
-  if (SEQ_SEL === i)    { SEQ_SEL = null; renderOrder(RESULT, ''); return; }
+  if (SEQ_SEL === null) { SEQ_SEL = i; paintSeqBox_(); return; }
+  if (SEQ_SEL === i)    { SEQ_SEL = null; paintSeqBox_(); return; }
   applyMove_(SEQ_SEL, i);
 }
 
@@ -1848,7 +1879,7 @@ document.addEventListener('click', function (ev) {
 
   // ④ 행 클릭 → 클릭 이동 (드래그 직후 발생하는 click 은 무시)
   const li = (t && t.closest) ? t.closest('li[data-seq]') : null;
-  if (!li || REROUTE_BUSY) return;
+  if (!li) return;   // ⭐ v4.4: 재계산 중에도 순서 변경 가능
   if (DRAG_JUST_ENDED) { DRAG_JUST_ENDED = false; return; }
   clickMoveSeq_(Number(li.dataset.seq));
 });
@@ -1861,7 +1892,7 @@ document.addEventListener('pointerdown', function (ev) {
   if (!h) return;
 
   const li = h.closest('li[data-seq]');
-  if (!li || REROUTE_BUSY) return;
+  if (!li) return;   // ⭐ v4.4: 재계산 중에도 드래그 가능
 
   DRAG_CTX = { li: li, pointerId: ev.pointerId, moved: false };
   li.classList.add('dragging');
@@ -1908,14 +1939,14 @@ document.addEventListener('pointerup', function (ev) {
     SEQ_DIRTY  = true;
     SEQ_SEL    = null;
   }
-  renderOrder(RESULT, '');
+  paintSeqBox_();   // ⭐ v4.4: 드래그 종료 → 목록만 갱신 (결과화면 유지)
 });
 
 document.addEventListener('pointercancel', function (ev) {
   if (!DRAG_CTX || ev.pointerId !== DRAG_CTX.pointerId) return;
   DRAG_CTX.li.classList.remove('dragging');
   DRAG_CTX = null;
-  renderOrder(RESULT, '');
+  paintSeqBox_();
 });
 
 /* ── 지정한 순서 그대로 카카오 경로 1회 재계산 ── */
@@ -2278,6 +2309,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js').catch(function () {});
 }
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 </body>
