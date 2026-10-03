@@ -214,21 +214,6 @@
     border-bottom:1px dashed rgba(255,255,255,.15);
   }
   .olist li:last-child{border-bottom:0}
-
-  /* ⭐ 결과 화면 수동 순서변경 */
-  .order-main{
-    display:flex;align-items:center;gap:8px;min-width:0;flex:1;
-  }
-  .order-name{
-    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  }
-  .order-actions{
-    display:flex;gap:4px;margin-left:auto;flex-shrink:0;
-  }
-  .order-actions .btn{
-    width:28px;height:28px;padding:0;font-size:11px;border-radius:7px;
-  }
-
   .pin{
     width:22px;height:22px;border-radius:50%;background:#ea580c;color:#fff;
     font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
@@ -334,14 +319,9 @@
       <button class="btn tmap" id="btnTmap" style="flex:1">📱 티맵 앱으로 열기 (목적지)</button>
       <button class="btn ghost small" id="btnCopyOrder" disabled>📋 순서 목록 복사</button>
     </div>
-    <!-- ⭐ 현재 최적/수동 순서를 카카오 네비 앱으로 전달 -->
-    <div class="toolbar" style="margin-top:8px">
-      <button class="btn" id="btnKakaoNavi" disabled style="flex:1">🧭 카카오 네비로 열기</button>
-    </div>
     <div class="legend meta">
       · 목적지만 입력한 뒤 <b>📱 티맵 앱으로 열기</b>를 누르면 최적화 없이 바로 티맵이 열립니다.<br>
       · 카카오 실시간 교통 정보로 총 시간/거리를 먼저 확인합니다.<br>
-      · <b>🧭 카카오 네비</b>는 현재 순서를 그대로 전달하며, 공식 앱 연동은 경유지 최대 3곳까지 지원합니다.<br>
       · 티맵 딥링크는 공식적으로 경유지를 지원하지 않아 <b>목적지 1곳만</b> 전달됩니다.<br>
       · 각 배송지의 📋 복사 버튼으로 주소를 복사 → 티맵에서 붙여넣어 경유지를 순서대로 추가하세요.
     </div>
@@ -363,7 +343,7 @@
    ⚙️ 1. 설정 — 여기만 수정하세요
    ============================================================================ */
 const GAS_URL =
-  'https://script.google.com/macros/s/AKfycbz7XtamqCvMPeoVuyywdlJkv87eh-srsUYOufaXIQeQSxvK4v6utSQzLvqPyzvw1kWh8w/exec';
+  'https://script.google.com/macros/s/AKfycbxvHu6H_vMn0gaZt6hB4s3uWYK9H4vGwG8PABaog6cxasNVNT_lx99KHCEtLtglX_orXQ/exec';
 const KAKAO_JS_KEY = 'cd143a1f0fdb6106f499b67535d11b2f';
 const MAX_ROWS = 6;
 
@@ -377,8 +357,6 @@ let START    = { name: '현재위치', lat: HOME.lat, lng: HOME.lng, manual: fal
 let RESULT   = null;
 let map      = null;
 let mapLayer = null;
-let KAKAO_NAVI_SDK_STATE = 'idle';   // idle | loading | ready | error
-let KAKAO_NAVI_SDK_WAITERS = [];
 
 /* ============================================================================
    ⚙️ 2. GAS 호출 (POST text/plain → CORS 프리플라이트 회피 / 실패 시 JSONP 폴백)
@@ -1314,7 +1292,6 @@ $('btnRun').addEventListener('click', async function () {
     syncResultGeoToRows(res);
 
     $('btnCopyOrder').disabled = false;
-    updateKakaoNaviBtn_();
     updateTmapBtn();
 
     document.body.classList.add('result-mode');   // ⭐ bg2.png 모드
@@ -1425,19 +1402,12 @@ function loadKakaoSDK() {
   });
 }
 
-// traffic_state → 색상
-// ⭐ 카카오 공식 코드:
-//    0 정보없음 / 1 정체 / 2 지체 / 3 서행 / 4 원활 / 6 사고(통행불가)
-// ⭐ 사용자 표시 기준:
-//    원활 = 파랑 / 지체·서행 = 주황 / 정체·사고 = 빨강
+// traffic_state → 색상 (카카오 기준: 1 원활 / 2 서서히 / 3·4 정체·통제 / 0 정보없음)
 function trafficColor(state) {
-  const s = Number(state);
-
-  if (s === 4) return '#1976d2';             // 원활 - 파랑
-  if (s === 2 || s === 3) return '#f59e0b'; // 지체·서행 - 주황
-  if (s === 1 || s === 6) return '#dc2626'; // 정체·사고 - 빨강
-
-  return '#64748b';                          // 정보없음 - 회색
+  if (state === 1) return '#1976d2';   // 원활 - 파랑
+  if (state === 2) return '#f59e0b';   // 서서히 주행 - 주황
+  if (state === 3 || state === 4) return '#dc2626'; // 정체 - 빨강
+  return '#2563eb';
 }
 
 async function drawMap(res) {
@@ -1521,10 +1491,8 @@ function renderOrder(res, mapNote) {
   const min = Math.round((res.totalTimeSec || 0) / 60);
 
   let head = '<b>'
-    + (res.manualOrder
-        ? '✋ 수동 순서 적용 완료 (카카오 실시간 교통 반영)'
-        : (res.single ? '✅ 목적지 경로 준비 완료 (경유지 없음 — 실시간 교통 반영)'
-                      : '✅ 경유지 순서 최적화 완료 (카카오 실시간 교통 반영)'))
+    + (res.single ? '✅ 목적지 경로 준비 완료 (경유지 없음 — 실시간 교통 반영)'
+                  : '✅ 경유지 순서 최적화 완료 (카카오 실시간 교통 반영)')
     + '</b>';
 
   head += '<div class="sumbox">'
@@ -1535,344 +1503,35 @@ function renderOrder(res, mapNote) {
     +   '<div class="lbl">통요금</div></div>' : '')
     + '</div>';
 
-  if ((res.order || []).length) {
-    head += '<div class="hint" style="margin-top:8px">'
-      + '↕ 각 경유지의 <b>▲▼</b> 버튼으로 순서를 바꾸면 '
-      + '<b>총 시간·총 거리·각 구간 시간/거리·지도</b>가 다시 계산됩니다.'
-      + '</div>';
-  }
-
   let html = head + '<ul class="olist">'
-    + '<li>'
-    +   '<div class="order-main">'
-    +     '<span class="pin" style="background:#2563eb">출</span>'
-    +     '<span class="order-name">' + esc(res.start.name) + '</span>'
-    +   '</div>'
-    + '</li>';
+    + '<li><span class="pin" style="background:#2563eb">출</span>' + esc(res.start.name) + '</li>';
 
   (res.order || []).forEach(function (v, i) {
 
     const leg = (res.legs && res.legs[i]) || null;
 
-    html += '<li>'
-      + '<div class="order-main">'
-      +   '<span class="pin">' + (i + 1) + '</span>'
-      +   '<span class="order-name">' + esc(v.name) + '</span>'
-      +   (leg ? '<span class="meta" style="margin-left:auto">'
+    html += '<li><span class="pin">' + (i + 1) + '</span>' + esc(v.name)
+      + (leg ? '<span class="meta" style="margin-left:auto">'
           + (leg.distance / 1000).toFixed(1) + 'km · ' + Math.round(leg.duration / 60) + '분</span>' : '')
-      + '</div>'
-      + '<div class="order-actions">'
-      +   '<button class="btn ghost" data-result-move="up" data-result-index="' + i + '"'
-      +     (i === 0 ? ' disabled' : '') + ' title="한 칸 위로">▲</button>'
-      +   '<button class="btn ghost" data-result-move="down" data-result-index="' + i + '"'
-      +     (i === (res.order || []).length - 1 ? ' disabled' : '') + ' title="한 칸 아래로">▼</button>'
-      + '</div>'
       + '</li>';
   });
 
   const lastLeg = (res.legs && res.legs.length) ? res.legs[res.legs.length - 1] : null;
 
-  html += '<li>'
-    + '<div class="order-main">'
-    +   '<span class="pin" style="background:#dc2626">★</span>'
-    +   '<span class="order-name">' + esc(res.goal.name) + '</span>'
-    +   (lastLeg ? '<span class="meta" style="margin-left:auto">'
+  html += '<li><span class="pin" style="background:#dc2626">★</span>' + esc(res.goal.name)
+    + (lastLeg ? '<span class="meta" style="margin-left:auto">'
         + (lastLeg.distance / 1000).toFixed(1) + 'km · ' + Math.round(lastLeg.duration / 60) + '분</span>' : '')
-    +   '<span class="meta" style="margin-left:6px">목적지</span>'
-    + '</div>'
-    + '</li>'
+    + '<span class="meta" style="margin-left:6px">목적지</span></li>'
     + '</ul>';
 
   html += '<div class="hint">· 경로 색상: <span style="color:#1976d2">파랑=원활</span> / '
-    + '<span style="color:#f59e0b">주황=지체·서행</span> / '
-    + '<span style="color:#dc2626">빨강=정체·사고</span> (카카오 실시간)</div>';
+    + '<span style="color:#f59e0b">주황=서서히</span> / '
+    + '<span style="color:#dc2626">빨강=정체</span> (실시간)</div>';
 
   if (mapNote) html += mapNote;
 
   showResult(html, 'ok');
 }
-
-/* ============================================================================
-   ⭐ 11-1. 결과 화면 수동 순서변경
-   - 현재 최적화 결과의 경유지만 한 칸씩 이동
-   - 최종 목적지는 항상 고정
-   - GAS manualroute가 같은 순서로 다시 카카오 길찾기를 호출
-   ============================================================================ */
-let RESULT_ROUTE_BUSY = false;
-
-async function moveResultStop_(index, dir) {
-
-  if (!RESULT || RESULT_ROUTE_BUSY) return;
-
-  const order = Array.isArray(RESULT.order) ? RESULT.order.slice() : [];
-  const target = index + dir;
-
-  if (index < 0 || index >= order.length) return;
-  if (target < 0 || target >= order.length) return;
-
-  const nextOrder = order.slice();
-  const tmp = nextOrder[index];
-  nextOrder[index] = nextOrder[target];
-  nextOrder[target] = tmp;
-
-  RESULT_ROUTE_BUSY = true;
-
-  // 기존 결과는 그대로 두고, 재계산 중임을 먼저 표시
-  showResult(
-    '⏳ 수동 순서 적용 중…<br>'
-    + '카카오 실시간 교통을 다시 반영하여 총 시간·거리와 각 구간을 계산합니다.',
-    'info'
-  );
-
-  try {
-
-    const res = await callApi({
-      action: 'manualroute',
-      start: RESULT.start,
-      orderedStops: nextOrder,
-      goal: RESULT.goal
-    }, 120000);
-
-    if (!res.ok) {
-      // 실패하면 기존 RESULT를 그대로 유지
-      renderOrder(RESULT, '<div class="meta" style="margin-top:6px">⚠️ 수동 순서 적용 실패: '
-        + esc(res.error || '알 수 없는 오류') + '</div>');
-      showToast('❌ 순서 변경 실패');
-      return;
-    }
-
-    RESULT = res;
-
-    syncResultGeoToRows(res);
-
-    try {
-      await drawMap(res);
-    } catch (mapErr) {
-      $('map').style.display = 'none';
-      renderOrder(
-        res,
-        '<div class="meta" style="margin-top:6px">⚠️ 지도 표시 실패: '
-        + esc(mapErr.message)
-        + ' (시간/거리와 순서 기능은 정상입니다)</div>'
-      );
-      updateKakaoNaviBtn_();
-      return;
-    }
-
-    renderOrder(res, '');
-    updateKakaoNaviBtn_();
-
-    try { $('resultCard').scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) {}
-
-  } catch (err) {
-
-    renderOrder(
-      RESULT,
-      '<div class="meta" style="margin-top:6px">⚠️ 수동 순서 적용 실패: '
-      + esc(err.message) + '</div>'
-    );
-    showToast('❌ 순서 변경 실패');
-
-  } finally {
-    RESULT_ROUTE_BUSY = false;
-  }
-}
-
-
-/* ============================================================================
-   ⭐ 11-2. 결과 화면 버튼 위임
-   ============================================================================ */
-$('result').addEventListener('click', function (ev) {
-
-  const btn = ev.target.closest
-    ? ev.target.closest('button[data-result-move]')
-    : null;
-
-  if (!btn) return;
-
-  const index = Number(btn.dataset.resultIndex);
-  const dir = btn.dataset.resultMove === 'up' ? -1 : 1;
-
-  moveResultStop_(index, dir);
-});
-
-
-/* ============================================================================
-   ⭐ 11-3. 카카오 네비 JavaScript SDK 로더
-   - 지도 SDK와 별개
-   - 실제 카카오 네비 버튼을 눌렀을 때만 로드
-   ============================================================================ */
-function kakaoNaviFailError_() {
-  return new Error(
-    '카카오 네비 SDK를 불러오지 못했습니다.\n'
-    + '카카오 JavaScript 키와 JavaScript SDK 도메인 등록을 확인하세요.'
-  );
-}
-
-function loadKakaoNaviSDK_() {
-
-  return new Promise(function (resolve, reject) {
-
-    if (window.Kakao && Kakao.Navi) {
-
-      try {
-        if (!Kakao.isInitialized || !Kakao.isInitialized()) {
-          Kakao.init(KAKAO_JS_KEY);
-        }
-
-        KAKAO_NAVI_SDK_STATE = 'ready';
-        resolve();
-        return;
-
-      } catch (e) {
-        KAKAO_NAVI_SDK_STATE = 'error';
-        reject(kakaoNaviFailError_());
-        return;
-      }
-    }
-
-    if (KAKAO_NAVI_SDK_STATE === 'error') {
-      reject(kakaoNaviFailError_());
-      return;
-    }
-
-    KAKAO_NAVI_SDK_WAITERS.push({ resolve: resolve, reject: reject });
-
-    if (KAKAO_NAVI_SDK_STATE === 'loading') return;
-
-    KAKAO_NAVI_SDK_STATE = 'loading';
-
-    const s = document.createElement('script');
-
-    s.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js';
-
-    s.onload = function () {
-
-      try {
-
-        if (!window.Kakao || !Kakao.Navi) {
-          throw new Error('Kakao.Navi가 SDK에 포함되어 있지 않습니다.');
-        }
-
-        Kakao.init(KAKAO_JS_KEY);
-
-        KAKAO_NAVI_SDK_STATE = 'ready';
-
-        KAKAO_NAVI_SDK_WAITERS.forEach(function (w) {
-          w.resolve();
-        });
-
-        KAKAO_NAVI_SDK_WAITERS = [];
-
-      } catch (e) {
-
-        KAKAO_NAVI_SDK_STATE = 'error';
-
-        const err = kakaoNaviFailError_();
-
-        KAKAO_NAVI_SDK_WAITERS.forEach(function (w) {
-          w.reject(err);
-        });
-
-        KAKAO_NAVI_SDK_WAITERS = [];
-      }
-    };
-
-    s.onerror = function () {
-
-      KAKAO_NAVI_SDK_STATE = 'error';
-
-      const err = kakaoNaviFailError_();
-
-      KAKAO_NAVI_SDK_WAITERS.forEach(function (w) {
-        w.reject(err);
-      });
-
-      KAKAO_NAVI_SDK_WAITERS = [];
-    };
-
-    document.head.appendChild(s);
-  });
-}
-
-
-function updateKakaoNaviBtn_() {
-  const btn = $('btnKakaoNavi');
-  if (!btn) return;
-
-  btn.disabled = !RESULT;
-}
-
-
-/* ============================================================================
-   ⭐ 11-4. 카카오 네비 실행
-   - 현재 RESULT.order 순서를 그대로 전달
-   - Kakao.Navi 공식 viaPoints 최대 3개
-   - 4~5개 경유지는 전체 순서를 한 번에 전달할 수 없으므로
-     일부만 잘라서 실행하지 않고 사용자에게 명확히 안내
-   ============================================================================ */
-$('btnKakaoNavi').addEventListener('click', async function () {
-
-  if (!RESULT) {
-    showToast('먼저 경로 최적화를 실행하세요.');
-    return;
-  }
-
-  const order = Array.isArray(RESULT.order) ? RESULT.order : [];
-
-  if (order.length > 3) {
-
-    alert(
-      '현재 카카오 네비 앱 연동은 경유지를 최대 3곳까지만 전달할 수 있습니다.\n\n'
-      + '현재 경유지: ' + order.length + '곳\n'
-      + '전체 ' + order.length + '곳을 임의로 잘라서 실행하지 않습니다.\n\n'
-      + '경로 전체는 이 화면의 카카오 지도에서 확인할 수 있습니다.'
-    );
-
-    return;
-  }
-
-  const btn = $('btnKakaoNavi');
-  btn.disabled = true;
-
-  try {
-
-    await loadKakaoNaviSDK_();
-
-    const settings = {
-      name: RESULT.goal.name || '목적지',
-      x: Number(RESULT.goal.lng),
-      y: Number(RESULT.goal.lat),
-      coordType: 'wgs84'
-    };
-
-    if (order.length) {
-
-      settings.viaPoints = order.map(function (v) {
-        return {
-          name: v.name || '경유지',
-          x: Number(v.lng),
-          y: Number(v.lat)
-        };
-      });
-    }
-
-    if (!window.Kakao || !Kakao.Navi || typeof Kakao.Navi.start !== 'function') {
-      throw new Error('카카오 네비 실행 기능을 찾지 못했습니다.');
-    }
-
-    Kakao.Navi.start(settings);
-
-  } catch (err) {
-
-    alert('❌ 카카오 네비 실행 실패\n\n' + String(err.message || err));
-
-  } finally {
-
-    updateKakaoNaviBtn_();
-  }
-});
-
 
 /* ============================================================================
    ⚙️ 12. 티맵 앱 딥링크 (공식 지원: 목적지 1곳만) + 순서 목록 복사
@@ -1898,7 +1557,6 @@ function updateTmapBtn() {
 function invalidateResult_() {
   RESULT = null;
   $('btnCopyOrder').disabled = true;
-  updateKakaoNaviBtn_();
   updateTmapBtn();
 }
 function buildTmapUrl() {
@@ -1984,7 +1642,6 @@ $('btnAdd').addEventListener('click', function () { addRow(); });
 $('btnClear').addEventListener('click', function () {
   ROWS = []; RESULT = null;
   $('btnCopyOrder').disabled = true;
-  updateKakaoNaviBtn_();
   updateTmapBtn();
   $('map').style.display = 'none';
   $('resultCard').style.display = 'none';
