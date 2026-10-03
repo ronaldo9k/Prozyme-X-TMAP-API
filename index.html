@@ -65,7 +65,7 @@
   .btn.tmap{background:#e11d48}
   .btn:disabled{opacity:.45;cursor:not-allowed}
   .row{
-    display:grid;grid-template-columns:34px minmax(0,1fr) 70px;gap:8px;align-items:start;
+    display:grid;grid-template-columns:34px minmax(0,1fr) 65px;gap:8px;align-items:start;
     border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:8px;
     background:rgba(15,23,42,.45);
   }
@@ -82,11 +82,33 @@
     font-size:14px;background:rgba(255,255,255,.92);color:#0f172a;
   }
   input[type=text]:focus{outline:2px solid #93c5fd;border-color:var(--brand)}
-  .acts{display:grid;grid-template-columns:repeat(4,30px);gap:5px}
+  /* ⭐ PC도 모바일과 동일하게 버튼을 2개씩 3줄로 배치 */
+  .acts{
+    display:grid;
+    grid-template-columns:repeat(2,30px);
+    grid-auto-rows:28px;
+    gap:5px;
+    width:65px;
+    justify-content:end;
+  }
   .acts .btn{padding:0;width:30px;height:28px;font-size:12px;line-height:1;border-radius:7px}
 
 @media (max-width:600px){
 
+  /* ⭐ 즐겨찾기 칩은 모바일에서 기존 위치(배송지 제목 바로 아래)를 유지 */
+  .delivery-card{
+    display:flex;
+    flex-direction:column;
+  }
+  .delivery-card h2{order:1}
+  .delivery-card #presetChips{order:2}
+  .delivery-card #presetAddBar{order:3}
+  .delivery-card #rows{order:4}
+  .delivery-card > .toolbar:not(#presetAddBar){order:5}
+  .delivery-card > .hint{order:6}
+
+
+  /* ⭐ 모바일 기존 레이아웃 그대로 유지 */
   .acts{
     display:grid;
     grid-template-columns:repeat(2,30px);
@@ -238,7 +260,7 @@
 <header>
   <div class="hrow">
     <div>
-      <h1>🚗 푸로찜에스 티맵 경로 도우미 <span style="color:#60a5fa">v4.1 카카오</span></h1>
+      <h1>🚗 푸로찜 최적경로 <span style="color:#60a5fa">FENOMENO RONALDO</span></h1>
       <p>카카오 실시간 경로 확인 → 주소 복사 → 티맵 최종 주행</p>
     </div>
     <button class="btn ghost small" id="btnTest">🔗 연결테스트</button>
@@ -264,9 +286,8 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card delivery-card">
     <h2>📍 배송지 입력 (최대 6곳 · ★ = 최종 목적지)</h2>
-    <div class="chips" id="presetChips"></div>
     <div class="toolbar" id="presetAddBar" style="display:none">
       <input type="text" id="presetName" placeholder="즐겨찾기 이름 (예: 창고)" style="max-width:110px">
       <input type="text" id="presetAddr" placeholder="주소" style="flex:1;min-width:140px">
@@ -285,6 +306,8 @@
       <b>📋</b> 버튼으로 주소를 복사 → 티맵 앱에 붙여넣어 경유지를 추가하세요.<br>
       <b>▲▼</b> 순서변경 · <b>★</b> 목적지 지정 · <b>✕</b> 삭제
     </div>
+    <!-- ⭐ PC에서는 안내문 바로 아래, 모바일에서는 기존 위치로 표시 -->
+    <div class="chips" id="presetChips"></div>
   </div>
 
   <div class="card">
