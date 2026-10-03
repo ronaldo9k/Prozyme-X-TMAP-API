@@ -300,14 +300,14 @@
       <button class="btn small" id="btnAdd">＋ 배송지 추가</button>
       <button class="btn ghost small" id="btnClear">전체 지우기</button>
     </div>
-      <div class="hint">
+    <!-- ⭐ PC/모바일 공통: 추가/배송/전체지우기 버튼 바로 아래에 즐겨찾기 표시 -->
+    <div class="chips" id="presetChips"></div>
+    <div class="hint">
       즐겨찾기 칩의 <b>🚩</b>를 누르면 그 곳이 출발지로 설정됩니다.<br>
       거래처명 입력 시 노션 주소가 자동 채워지고, <b>입력 즉시 좌표가 자동 확인</b>됩니다.<br>
       <b>📋</b> 버튼으로 주소를 복사 → 티맵 앱에 붙여넣어 경유지를 추가하세요.<br>
       <b>▲▼</b> 순서변경 · <b>★</b> 목적지 지정 · <b>✕</b> 삭제
     </div>
-    <!-- ⭐ PC/모바일 공통: 안내문 바로 아래에 즐겨찾기 표시 -->
-    <div class="chips" id="presetChips"></div>
   </div>
 
   <div class="card">
@@ -1090,6 +1090,7 @@ async function setStartByAddress_() {
     $('btnStartAddress').disabled = false;
 
   }
+
 }
 
 /* 주소 입력창에서 Enter를 눌러도 바로 검색 */
