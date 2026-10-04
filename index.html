@@ -197,10 +197,21 @@
     cursor:pointer;
   }
   .chip .x{color:#fca5a5;font-weight:700;padding-left:2px}
-  .chip .chip-go{cursor:pointer}
+  .chip .chip-go{cursor:pointer;padding:2px 1px}
+  /* ⭐ v4.5: 🚩(출발지) 버튼은 칩 본문과 확실히 분리해
+     실수로 눌러 출발지가 바뀌는 것을 막습니다 */
   .chip .chip-start{
-    cursor:pointer;background:rgba(234,88,12,.35);border-radius:999px;
-    padding:0 4px;margin-left:2px;
+    cursor:pointer;background:rgba(234,88,12,.55);border-radius:999px;
+    padding:1px 6px;margin-left:6px;
+    border:1px solid rgba(251,146,60,.85);
+    font-size:11px;line-height:1.5;
+  }
+  .chip .chip-start:active{background:rgba(249,115,22,.9)}
+  /* ⭐ v4.5: 즐겨찾기 버튼으로 채워진 행을 반짝여서 어디에 들어갔는지 바로 보이게 */
+  .row.flash{animation:rowFlash 1.05s ease-out 2}
+  @keyframes rowFlash{
+    0%{box-shadow:0 0 0 2px rgba(250,204,21,.95);background:rgba(250,204,21,.20)}
+    100%{box-shadow:0 0 0 0 rgba(250,204,21,0);background:transparent}
   }
   details{margin-top:8px}
   details summary{cursor:pointer;font-size:12px;color:#93c5fd;font-weight:600}
@@ -651,17 +662,27 @@ function applyPreset(idx) {
   const p = loadPresets()[idx];
   if (!p) return;
 
-  // 비어 있는 첫 행에 채우고, 없으면 새 행 추가
-  let row = ROWS.find(function (r) { return !(r.name || '').trim() && !(r.address || '').trim(); });
+  /* ⭐ v4.5: 즐겨찾기 버튼은 "항상" 배송지 입력칸만 채욵니다.
+     · 출발지 영역(startName/startAddress) · START 값은 절대 건드리지 않습니다.
+     · ① 비어 있는 첫 배송지 행 → ② 없으면 새 행 추가 → ③ 가득차면 안내 */
+  let row = ROWS.find(function (r) {
+    return !(r.name || '').trim() && !(r.address || '').trim();
+  });
+
   if (!row) {
-    if (ROWS.length >= MAX_ROWS) { showToast('최대 ' + MAX_ROWS + '곳까지 입력할 수 있습니다.'); return; }
+    if (ROWS.length >= MAX_ROWS) {
+      showToast('배송지가 ' + MAX_ROWS + '곳으로 가득 찼습니다. 빈 칸을 지운 뒤 다시 눌러주세요.');
+      return;
+    }
     addRow();
     row = ROWS[ROWS.length - 1];
   }
 
-  row.name = p.name || p.label || '';
+  if (!row) return;
+
+  row.name    = p.name || p.label || '';
   row.address = p.address || '';
-  row.geo = null;
+  row.geo     = null;
   invalidateResult_();
 
   const nameEl = document.querySelector('input[data-id="' + row.id + '"][data-k="name"]');
@@ -669,11 +690,23 @@ function applyPreset(idx) {
   if (nameEl) nameEl.value = row.name;
   if (addrEl) addrEl.value = row.address;
 
+  /* ⭐ v4.5: 어디에 들어갔는지 바로 보이게 — 행 강조 + 스크롤 */
+  const rowBox = nameEl ? nameEl.closest('.row') : null;
+  if (rowBox) {
+    rowBox.classList.remove('flash');
+    void rowBox.offsetWidth;                 // 애니메이션 재시작
+    rowBox.classList.add('flash');
+    try { rowBox.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+  }
+
   updateRowStatus(row.id);
   autoCheckRow(row.id);   // ⭐ 즉시 자동 좌표확인
 }
 
 $('presetChips').addEventListener('click', function (ev) {
+  const chip = ev.target.closest ? ev.target.closest('.chip') : null;
+  if (!chip) return;
+
   const x = ev.target.closest ? ev.target.closest('.x') : null;
   if (x) {
     const all = loadPresets();
@@ -683,11 +716,24 @@ $('presetChips').addEventListener('click', function (ev) {
     renderPresets();
     return;
   }
-  // ⭐ 🚩 = 출발지로 설정 / 그 외 영역 클릭 = 배송지로 추가
+
+  /* ⭐ v4.5: 🚩(출발지) 만 예외 — 실수로 눌려 출발지가 바뀌는 것을 막기 위해 확인창을 거쿀습니다. */
   const st = ev.target.closest ? ev.target.closest('.chip-start') : null;
-  if (st) { applyPresetAsStart(Number(st.dataset.start)); return; }
-  const go = ev.target.closest ? ev.target.closest('.chip-go') : null;
-  if (go) { applyPreset(Number(go.dataset.go)); return; }
+  if (st) {
+    const p  = loadPresets()[Number(st.dataset.start)];
+    const nm = p ? (p.name || p.label || '즐겨찾기') : '즐겨찾기';
+    if (window.confirm('🚩 ' + nm + ' 을(를) "출발지"로 설정할까요?\n\n(취소하면 배송지로 추가됩니다)')) {
+      applyPresetAsStart(Number(st.dataset.start));
+    } else {
+      applyPreset(Number(st.dataset.start));   // 취소 → 배송지로 추가
+    }
+    return;
+  }
+
+  /* ⭐ v4.5: 칩의 어느 부분(여백·패딩 포함)을 눌러도 반드시 배송지로 추가됩니다.
+     (기존에는 라벨 영역을 정확히 눌러야만 동작해서 "안 들어가는" 경우가 있었습니다) */
+  const i = Number(chip.dataset.i);
+  if (isFinite(i)) applyPreset(i);
 });
 
 $('btnAddPreset').addEventListener('click', function () {
@@ -1573,6 +1619,16 @@ async function drawMap(res) {
     });
   }
 
+  /* ⭐ v4.5: 지도 확대/축소(+ −) 컨트롤 — 오른쪽에 표시
+     · 지도 생성 직후에 1번만 붙고, 플래그로 중복 적재를 막습니다.
+     · SDK 로딩 · 경로 폴리라인 · 캐시 코드는 전혀 건드리지 않습니다. */
+  try {
+    if (map && !map.__zoomCtrlAdded && kakao.maps.ZoomControl && kakao.maps.ControlPosition) {
+      map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+      map.__zoomCtrlAdded = true;
+    }
+  } catch (e) { /* 컨트롤이 실패해도 경로 표시는 정상 진행 */ }
+
   if (mapLayer) { mapLayer.forEach(function (o) { o.setMap(null); }); }
   mapLayer = [];
 
@@ -2309,6 +2365,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js').catch(function () {});
 }
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
