@@ -313,9 +313,10 @@
   }
   .olist li.seq-busy{opacity:.55}
 
-  /* ⭐ v4.3 추가: 순서목록 전용 그리드 — [⠿][핀][이름][▲▼][구간]
-     (기존 .olist li 규칙은 그대로 두고, seqlist 에서만 열을 하나 늘립니다) */
-  .olist.seqlist li{grid-template-columns:auto 24px minmax(0,1fr) auto auto auto;cursor:pointer}
+  /* ⭐ v4.3 추가: 순서목록 전용 그리드 — [⠿][핀][이름][구간]
+     (기존 .olist li 규칙은 그대로 두고, seqlist 에서만 열을 하나 늘립니다)
+     ⭐ v4.7: ▲▼ 열을 없애 [⠿][핀][이름][구간][✕] 로 정리 → 이름(거래처명) 칸이 넓어집니다 */
+  .olist.seqlist li{grid-template-columns:auto 24px minmax(0,1fr) auto auto;cursor:pointer}
   /* ⭐ v4.3: 드래그 핸들 (터치 스크롤과 충돌하지 않도록 touch-action:none) */
   /* ⭐ v4.4: ⠿ 드래그 핸들 시인성 강화 (기존은 흰반투명이라 밝은 카드에서 안 보였습니다) */
   .drag-handle{
@@ -348,10 +349,17 @@
     border:1px solid #047857;font-weight:900}
   .btn.recalc:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
 
+  /* ⭐ v4.7 (요청 1): ▲▼ 가 없어진 만큼 이름(거래처명) 칸을 넓고 잘 보이게 */
+  .olist.seqlist li{gap:6px}
+  .olist.seqlist li .nm{font-size:13.5px;line-height:1.42;letter-spacing:-.2px;padding-right:2px}
+  .olist.seqlist li .legtxt{font-size:11.5px}
+
   .msg.ok .meta{color:#334155}
   .msg.ok .hint{color:#475569}
 
   /* [요청 2·4] ▲▼ 버튼 — 흰색/투명 아님. 시안(▲) + 앰버(▼) */
+  /* ⭐ v4.7: 화면에서 ▲▼ 를 없앴습니다. 이 CSS 는 이제 쓰이지 않지만
+     (혹시 되돌리고 싶을 때를 위해) 삭제하지 않고 그대로 남겨 둡니다. */
   .ordbtns{display:flex;gap:4px}
   .ordbtn{
     width:31px;height:29px;padding:0;border-radius:8px;cursor:pointer;
@@ -432,7 +440,7 @@
       즐겨찾기 칩의 <b>🚩</b>를 누르면 그 곳이 출발지로 설정됩니다.<br>
       거래처명 입력 시 노션 주소가 자동 채워지고, <b>입력 즉시 좌표가 자동 확인</b>됩니다.<br>
       <b>📋</b> 버튼으로 주소를 복사 → 티맵 앱에 붙여넣어 경유지를 추가하세요.<br>
-      <b>▲▼</b> 순서변경 · <b>★</b> 목적지 지정 · <b>✕</b> 삭제
+      <b>⠿ 드래그</b>로 순서변경 · <b>★</b> 목적지 지정 · <b>✕</b> 삭제
     </div>
   </div>
 
@@ -471,6 +479,13 @@
 
 <script>
 /* ============================================================================
+   ⭐ v4.7 변경 (기존 기능 100% 유지 · 요청한 부분만 정리)
+     ① 결과 목록에서 [▲▼] 와 [행 클릭 이동] 을 없앴습니다 → ⠿ 드래그 하나로 순서 변경.
+        (▲▼ 칸이 사라져 거래처명·구간정보가 훨씬 넓고 잘 보입니다)
+     ② 노션에 주소가 없는 거래처는 상호명만으로 좌표를 찾지 않습니다.
+        → "주소 없음" 으로 표시하고, 엉뚱한 동명 업체 주소·좌표가 뜨지 않습니다.
+   ============================================================================ */
+/* ============================================================================
    ⭐ v4.6 변경 (기존 기능 100% 유지 · 추가/보강만)
      ① 📋 주소 복사 버튼 : "노션에서 가져온 거래처 주소(row.address)"를 우선 복사
         (예전에는 카카오가 매칭한 주소를 먼저 써서, 다른 지역 동명 업체 주소가 복사됐습니다)
@@ -482,7 +497,7 @@
    ⚙️ 1. 설정 — 여기만 수정하세요
    ============================================================================ */
 const GAS_URL =
-  'https://script.google.com/macros/s/AKfycby56TrGH1gmC3w9n2g-SJ3T6BcWqEVmuLDw8C1a-5rV9G96p2DuEtIwgV7jh3QAI8C0aA/exec';
+  'https://script.google.com/macros/s/AKfycbziQiE9XlsmDWEMlrgnBKgXGP8qR2WdXkUT9PSvfY2edvhHwL6BFEKEfCml_Wobfpjgeg/exec';
 const KAKAO_JS_KEY = 'cd143a1f0fdb6106f499b67535d11b2f';
 const MAX_ROWS = 6;
 
@@ -647,7 +662,7 @@ function defaultPresets() {
   return [
     { label: '🏠 집',   name: '집',   address: '서울시 종로구 계동 2길 15' },
     { label: '🏢 회사', name: '회사', address: '서울시 서대문구 창천동 97-125' },
-    { label: '🏫 학교', name: '학교', address: '서울특별시 성북구 성북로4길 52-1' }
+    { label: '🏫 학교', name: '학교', address: '우촌초등학교' }
   ];
 }
 
@@ -889,7 +904,9 @@ function pickDd(idx) {
   if (!row) return;
 
   row.name = c.name;
-  if (c.address) row.address = c.address;
+  /* ⭐ v4.7 (요청 2): 노션에 주소가 있으면 그대로 채우고,
+     주소가 없으면 빈칸으로 둡니다(임의 주소를 넣지 않습니다). */
+  row.address = c.address || '';
   row.geo = null;
 
   const nameEl = document.querySelector('input[data-id="' + rowId + '"][data-k="name"]');
@@ -899,6 +916,7 @@ function pickDd(idx) {
 
   closeDropdown();
   updateRowStatus(rowId);
+  if (!c.address) showToast('ℹ️ 이 거래처는 노션에 주소가 없습니다. 주소를 직접 입력하세요.');
   autoCheckRow(rowId);
   if (nameEl) nameEl.blur();
 }
@@ -1010,6 +1028,8 @@ function applyPresetAsStart(idx) {
 
 function statusBadgeHtml(r) {
   if (!r.geo) return '<span class="badge b-wait">미확인</span>';
+  /* ⭐ v4.7 (요청 2): 노션에 주소가 없는 거래처는 "주소 없음" 으로 표시 */
+  if (r.geo.nameOnly) return '<span class="badge b-warn">주소 없음</span>';
   if (!r.geo.ok) return '<span class="badge b-err">좌표 실패</span>';
 
   const q = r.geo.matchQuality || '';
@@ -1024,6 +1044,11 @@ function statusBadgeHtml(r) {
 
 function statusMetaHtml(r) {
   if (!r.geo) return '';
+
+  /* ⭐ v4.7 (요청 2): 주소 없는 거래처 안내 (임의 주소·좌표를 보여주지 않습니다) */
+  if (r.geo.nameOnly) {
+    return '<div class="meta">ℹ️ ' + esc(r.geo.reason || '노션에 주소가 없는 거래처입니다. 주소를 직접 입력하세요.') + '</div>';
+  }
 
   if (r.geo.ok) {
     return '<div class="meta">'
@@ -1108,6 +1133,16 @@ function autoCheckRow(id) {
   const name = (row.name || '').trim();
   const addr = (row.address || '').trim();
   if (!name && !addr) return;
+
+  /* ⭐ v4.7 (요청 2): 주소가 없으면(거래처명만 있으면) 좌표 자동확인을 하지 않습니다.
+     · 상호명만으로 다른 지역 업체를 찾아 엉뚱한 주소·좌표를 보여주던 문제를 막습니다.
+     · 상호명 검색 자체는 없애지 않았습니다 → 주소를 직접 입력하면 예전처럼 확인됩니다. */
+  if (!addr) {
+    row.geo = { ok: false, nameOnly: true,
+      reason: '노션에 주소가 없는 거래처입니다. 주소를 직접 입력하면 좌표를 확인합니다.' };
+    updateRowStatus(row.id);
+    return;
+  }
 
   clearTimeout(autoTimers[id]);
   autoTimers[id] = setTimeout(async function () {
@@ -1739,19 +1774,13 @@ function seqBoxHtml_(res) {
     const nm = esc(n.name || '이름없음')
       + (last ? ' <span style="color:#b91c1c">(목적지)</span>' : '');
 
+    /* ⭐ v4.7 (요청 1): [▲▼] 와 "행 클릭 이동" 을 없앴습니다 → 순서는 ⠿ 드래그로만 바꿉니다.
+       ▲▼ 칸이 사라져 거래처명·구간정보가 훨씬 넓게 보입니다. */
     html += '<li data-seq="' + i + '"'
-      + ' class="' + (REROUTE_BUSY ? 'seq-busy' : '')
-      + (SEQ_SEL === i ? ' sel' : '') + '"'
-      + ' title="클릭하면 이 위치로 이동합니다">'
+      + ' class="' + (REROUTE_BUSY ? 'seq-busy' : '') + '">'
       + '<span class="drag-handle" title="잡고 위·아래로 끌어 이동">⠿</span>'
       + '<span class="pin" style="background:' + pinBg + '">' + pinTxt + '</span>'
       + '<span class="nm">' + nm + '</span>'
-      + '<span class="ordbtns">'
-      +   '<button class="ordbtn up" data-seq="' + i + '" data-dir="-1"'
-      +     ((first || REROUTE_BUSY) ? ' disabled' : '') + ' title="한 칸 위로">▲</button>'
-      +   '<button class="ordbtn dn" data-seq="' + i + '" data-dir="1"'
-      +     ((last || REROUTE_BUSY) ? ' disabled' : '') + ' title="한 칸 아래로">▼</button>'
-      + '</span>'
       + (leg ? '<span class="legtxt">' + (leg.distance / 1000).toFixed(1) + 'km · '
           + Math.round(leg.duration / 60) + '분 →</span>' : '<span></span>')
       /* ⭐ v4.6 (요청 4): 출발지(출)·목적지(★)는 삭제 불가, 경유지에만 ✕ 표시 */
@@ -1811,7 +1840,7 @@ function renderOrder(res, mapNote) {
   } else {
     /* ⭐ v4.3 (요청 개선 2): 순서는 화면에서만 바꾸고, 계산은 버튼 1번 */
     html += '<div class="meta" style="margin:2px 0 4px">'
-      + '순서 변경은 <b>⠿ 끌기</b> · <b>행 클릭(선택→이동)</b> · <b>▲▼</b> 로 하세요. '
+      + '순서 변경은 <b>⠿ 끌기</b>(손잡이를 잡고 위·아래로) 로 하세요. '
       + '바꾸는 동안에는 계산하지 않아 빠르고, 목록은 그대로 유지되어 계속 순서를 바꿀 수 있습니다. 끝난 뒤 <b>🔄 변경된 순서대로 재계산</b> 버튼 <b>1개</b>를 누르면 <b>딱 1번</b>만 계산합니다.'
       + '</div>';
   }
@@ -1848,7 +1877,7 @@ function renderOrder(res, mapNote) {
     + '<span style="color:#f59e0b">주황=서행</span> / '
     + '<span style="color:#ea580c">주황빨강=지체</span> / '
     + '<span style="color:#dc2626">빨강=정체</span> (실시간)<br>'
-    + '· 순서변경은 <b>⠿ 드래그</b> · <b>행 클릭 이동</b> · <b>▲▼</b> 모두 사용할 수 있고, '
+    + '· 순서변경은 <b>⠿ 드래그</b>(손잡이를 잡고 위·아래로 끌기) 로 하면 됩니다. '
     + '<b>경유지뿐 아니라 출발지(출)·목적지(☆)</b>에도 적용됩니다. 맨 위가 출발지, 맨 아래가 목적지입니다.<br>'
     + '· 목록의 <b>✕</b> 를 누르면 그 경유지만 결과 목록에서 빠집니다(위 배송지 입력은 그대로 유지). 뺀 뒤 <b>🔄 재계산</b>을 누르세요.<br>'
     + '· 순서를 바꾼 뒤에는 <b>🔄 변경된 순서대로 재계산</b> 버튼을 눌러야 전체·구간 시간/거리가 갱신됩니다.</div>';
@@ -1916,19 +1945,11 @@ function applyMove_(from, to) {
   return true;
 }
 
-/* ▲▼ 클릭 → 인접 항목과 자리만 교환 (재계산 X) */
-function moveSeq_(i, dir) {
-  const j = i + dir;
-  if (applyMove_(i, j)) LAST_SWAP = { i: i, j: j };
-}
-
-/* 행 클릭 이동: 한 행을 클릭해 선택 → 다른 행을 클릭하면 그 위치로 이동 */
-function clickMoveSeq_(i) {
-  if (!RESULT || !RESULT.seq) return;
-  if (SEQ_SEL === null) { SEQ_SEL = i; paintSeqBox_(); return; }
-  if (SEQ_SEL === i)    { SEQ_SEL = null; paintSeqBox_(); return; }
-  applyMove_(SEQ_SEL, i);
-}
+/* ⭐ v4.7 (요청 1): ▲▼(moveSeq_) 와 행 클릭 이동(clickMoveSeq_) 함수는
+   화면에서 버튼을 없앴으므로 함께 제거했습니다.
+   · 순서 변경은 ⠿ 드래그 하나로 동작합니다 (아래 pointerdown/move/up 코드는 그대로).
+   · applyMove_() 는 "순서가 바뀌었음(SEQ_DIRTY)"을 표시하는 함수라 그대로 둡니다.
+   · 되돌리고 싶다면 이 자리에 원래 두 함수를 다시 넣으면 됩니다. */
 
 /* [🔄 순서대로 다시 계산] → 현재 순서 그대로 카카오 경로 1회 재계산 */
 function recalcSeq_() {
@@ -1961,7 +1982,8 @@ function deleteSeqItem_(i) {
   showToast('✕ 경유지를 목록에서 뺐습니다. [🔄 변경된 순서대로 재계산]을 눌러주세요.');
 }
 
-/* ── 결과화면 클릭 위임 (▲▼ / 행클릭이동 / 재계산) ──
+/* ── 결과화면 클릭 위임 (✕ 경유지 삭제 / 재계산) ──
+   ⭐ v4.7: ▲▼ 와 행 클릭 이동을 없앴으므로 이 위임에는 [🔄 재계산] 과 [✕] 만 남습니다.
    · 결과 영역은 매번 다시 그려지므로 "문서 위임" 방식으로 연결합니다. */
 document.addEventListener('click', function (ev) {
   const t = ev.target;
@@ -1970,14 +1992,7 @@ document.addEventListener('click', function (ev) {
   const rb = (t && t.closest) ? t.closest('#btnRecalc') : null;
   if (rb) { if (!rb.disabled) recalcSeq_(); return; }
 
-  // ② ▲▼
-  const b = (t && t.closest) ? t.closest('.ordbtn') : null;
-  if (b) {
-    if (b.disabled) return;
-    ev.stopPropagation();
-    moveSeq_(Number(b.dataset.seq), Number(b.dataset.dir));
-    return;
-  }
+  /* ⭐ v4.7 (요청 1): 여기 있던 ② ▲▼ 처리 블록은 버튼을 없앴으므로 제거했습니다. */
 
   // ②-1 ⭐ v4.6 (요청 4): [✕] 경유지 삭제 — 결과 목록에서만 제거 (위 배송지 입력은 그대로)
   const db = (t && t.closest) ? t.closest('.seq-del') : null;
@@ -1986,11 +2001,9 @@ document.addEventListener('click', function (ev) {
   // ③ 드래그 핸들 클릭은 무시 (드래그 전용)
   if (t && t.closest && t.closest('.drag-handle')) return;
 
-  // ④ 행 클릭 → 클릭 이동 (드래그 직후 발생하는 click 은 무시)
-  const li = (t && t.closest) ? t.closest('li[data-seq]') : null;
-  if (!li) return;   // ⭐ v4.4: 재계산 중에도 순서 변경 가능
-  if (DRAG_JUST_ENDED) { DRAG_JUST_ENDED = false; return; }
-  clickMoveSeq_(Number(li.dataset.seq));
+  /* ⭐ v4.7 (요청 1): 여기 있던 ④ "행 클릭 → 클릭 이동" 블록은 제거했습니다.
+     → 이제 행을 눌러도 아무 일도 일어나지 않고, 순서는 ⠿ 드래그로만 바뀝니다.
+     (드래그 직후의 click 을 막는 DRAG_JUST_ENDED 처리는 아래 pointer 코드에 그대로 있습니다) */
 });
 
 /* ── ⭐ v4.3: ⠿ 드래그 재정렬 (네이티브 포인터 이벤트 · 외부 라이브러리 0개)
