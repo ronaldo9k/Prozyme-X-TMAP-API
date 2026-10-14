@@ -315,7 +315,7 @@
 
   /* ⭐ v4.3 추가: 순서목록 전용 그리드 — [⠿][핀][이름][▲▼][구간]
      (기존 .olist li 규칙은 그대로 두고, seqlist 에서만 열을 하나 늘립니다) */
-  .olist.seqlist li{grid-template-columns:auto 24px minmax(0,1fr) auto auto;cursor:pointer}
+  .olist.seqlist li{grid-template-columns:auto 24px minmax(0,1fr) auto auto auto;cursor:pointer}
   /* ⭐ v4.3: 드래그 핸들 (터치 스크롤과 충돌하지 않도록 touch-action:none) */
   /* ⭐ v4.4: ⠿ 드래그 핸들 시인성 강화 (기존은 흰반투명이라 밝은 카드에서 안 보였습니다) */
   .drag-handle{
@@ -364,6 +364,15 @@
   .ordbtn:disabled{opacity:.30;cursor:not-allowed;box-shadow:none}
   .ordbtn.up{background:linear-gradient(180deg,#22d3ee,#0e7490);color:#04222b}
   .ordbtn.dn{background:linear-gradient(180deg,#fbbf24,#d97706);color:#3b2103}
+
+  /* ⭐ v4.6 (요청 4): 결과 목록의 경유지 삭제 [✕] — 레이아웃을 최소로 차지하는 조그만 버튼 */
+  .seq-del{
+    width:22px;height:22px;padding:0;border-radius:6px;cursor:pointer;
+    font-size:12px;font-weight:900;line-height:1;
+    background:rgba(220,38,38,.88);color:#fff;border:1px solid rgba(255,255,255,.45);
+    box-shadow:0 1px 4px rgba(0,0,0,.45);
+  }
+  .seq-del:active{transform:scale(.94)}
 
   /* [요청 3] 카카오내비 버튼 (카카오 옐로우) */
   .btn.knavi{background:#fee500;color:#191600;border:1px solid #d9c400;font-weight:800}
@@ -462,10 +471,18 @@
 
 <script>
 /* ============================================================================
+   ⭐ v4.6 변경 (기존 기능 100% 유지 · 추가/보강만)
+     ① 📋 주소 복사 버튼 : "노션에서 가져온 거래처 주소(row.address)"를 우선 복사
+        (예전에는 카카오가 매칭한 주소를 먼저 써서, 다른 지역 동명 업체 주소가 복사됐습니다)
+     ② 결과 목록에 [✕] 경유지 삭제 버튼 추가
+        → 결과 목록(RESULT.seq)에서만 빠지고, 위쪽 "배송지 입력" 목록은 그대로 유지됩니다.
+     ③ (GAS 쪽) 검색 기준 주소와 다른 지역의 동명 업체 좌표는 채택하지 않도록 지역 일치 검사 추가
+   ============================================================================ */
+/* ============================================================================
    ⚙️ 1. 설정 — 여기만 수정하세요
    ============================================================================ */
 const GAS_URL =
-  'https://script.google.com/macros/s/AKfycbzHZ7J43nV8Z4KppVWR9o6Tc4vi_QHIdqVWpMdWTz4BunJlqJ1pQ0734Tuss3T8y4k3Pg/exec';
+  'https://script.google.com/macros/s/AKfycby56TrGH1gmC3w9n2g-SJ3T6BcWqEVmuLDw8C1a-5rV9G96p2DuEtIwgV7jh3QAI8C0aA/exec';
 const KAKAO_JS_KEY = 'cd143a1f0fdb6106f499b67535d11b2f';
 const MAX_ROWS = 6;
 
@@ -1178,7 +1195,10 @@ $('rows').addEventListener('click', function (ev) {
   if (act === 'copy') {
     const row = ROWS.find(function (r) { return r.id === id; });
     if (!row) return;
-    const text = (row.matchedAddress || row.address || '').trim() || (row.name || '').trim();
+    /* ⭐ v4.6 (요청 1): 복사는 "노션에서 가져온 거래처 주소(row.address)"를 우선 사용합니다.
+       (예전: 카카오가 매칭한 주소가 먼저 → 다른 지역 동명 업체 주소가 복사되던 문제)
+       row.address 가 비어 있을 때만 예전처럼 매칭 주소/상호명으로 대체합니다. */
+    const text = (row.address || row.matchedAddress || '').trim() || (row.name || '').trim();
     if (!text) { showToast('복사할 주소가 없습니다.'); return; }
     copyText(text).then(function (ok) {
       showToast(ok ? '📋 복사 완료! 티맵에 붙여넣으세요.' : '복사 실패 — 길게 눌러 직접 복사해주세요.');
@@ -1734,6 +1754,10 @@ function seqBoxHtml_(res) {
       + '</span>'
       + (leg ? '<span class="legtxt">' + (leg.distance / 1000).toFixed(1) + 'km · '
           + Math.round(leg.duration / 60) + '분 →</span>' : '<span></span>')
+      /* ⭐ v4.6 (요청 4): 출발지(출)·목적지(★)는 삭제 불가, 경유지에만 ✕ 표시 */
+      + (first || last
+          ? '<span></span>'
+          : '<button class="seq-del" data-seq="' + i + '" title="이 경유지를 목록에서 삭제">✕</button>')
       + '</li>';
   });
 
@@ -1826,6 +1850,7 @@ function renderOrder(res, mapNote) {
     + '<span style="color:#dc2626">빨강=정체</span> (실시간)<br>'
     + '· 순서변경은 <b>⠿ 드래그</b> · <b>행 클릭 이동</b> · <b>▲▼</b> 모두 사용할 수 있고, '
     + '<b>경유지뿐 아니라 출발지(출)·목적지(☆)</b>에도 적용됩니다. 맨 위가 출발지, 맨 아래가 목적지입니다.<br>'
+    + '· 목록의 <b>✕</b> 를 누르면 그 경유지만 결과 목록에서 빠집니다(위 배송지 입력은 그대로 유지). 뺀 뒤 <b>🔄 재계산</b>을 누르세요.<br>'
     + '· 순서를 바꾼 뒤에는 <b>🔄 변경된 순서대로 재계산</b> 버튼을 눌러야 전체·구간 시간/거리가 갱신됩니다.</div>';
 
   if (mapNote) html += mapNote;
@@ -1912,6 +1937,30 @@ function recalcSeq_() {
   rerouteSeq_();
 }
 
+/* ⭐ v4.6 (요청 4): 결과 목록에서 불필요한 경유지를 [✕] 로 바로 삭제
+   · RESULT.seq (결과 목록) 에서만 빼냅니다.
+     → 위쪽 "배송지 입력(최대 6곳)" 목록(ROWS)은 전혀 건드리지 않습니다. (요청대로 그대로 유지)
+   · 삭제만으로는 계산하지 않고, 기존 [🔄 변경된 순서대로 재계산] 버튼 1번으로 총거리/예상소요를 갱신합니다.
+   · ⠿ 드래그 · ▲▼ · 행 클릭 이동과 완전히 같이 동작합니다. */
+function deleteSeqItem_(i) {
+  if (!RESULT || !RESULT.seq) return;
+
+  const seq = RESULT.seq;
+  if (i <= 0 || i >= seq.length - 1) return;   // 출발지·목적지는 삭제하지 않습니다
+
+  seq.splice(i, 1);          // 결과 목록에서만 1건 제거
+
+  /* "📋 순서 목록 복사" 결과도 화면과 같게 맞춰 줍니다 (RESULT.order 에서도 같은 항목만 제거) */
+  if (RESULT.order && (i - 1) < RESULT.order.length) RESULT.order.splice(i - 1, 1);
+
+  SEQ_DIRTY = true;          // "순서 변경됨 · 재계산 필요" 표시
+  SEQ_SEL   = null;
+  LAST_SWAP = null;
+
+  paintSeqBox_();            // 목록만 다시 그림 (결과화면 · 지도 유지 · API 0회)
+  showToast('✕ 경유지를 목록에서 뺐습니다. [🔄 변경된 순서대로 재계산]을 눌러주세요.');
+}
+
 /* ── 결과화면 클릭 위임 (▲▼ / 행클릭이동 / 재계산) ──
    · 결과 영역은 매번 다시 그려지므로 "문서 위임" 방식으로 연결합니다. */
 document.addEventListener('click', function (ev) {
@@ -1929,6 +1978,10 @@ document.addEventListener('click', function (ev) {
     moveSeq_(Number(b.dataset.seq), Number(b.dataset.dir));
     return;
   }
+
+  // ②-1 ⭐ v4.6 (요청 4): [✕] 경유지 삭제 — 결과 목록에서만 제거 (위 배송지 입력은 그대로)
+  const db = (t && t.closest) ? t.closest('.seq-del') : null;
+  if (db) { ev.stopPropagation(); deleteSeqItem_(Number(db.dataset.seq)); return; }
 
   // ③ 드래그 핸들 클릭은 무시 (드래그 전용)
   if (t && t.closest && t.closest('.drag-handle')) return;
